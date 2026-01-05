@@ -24,12 +24,9 @@ import {
     View
 } from 'react-native';
 
-// --- Tipos ---
-type UserRole = 'POLITICO' | 'ASSESSOR' | 'ELEITOR' | null;
-
 // --- Componente Principal ---
 export default function App() {
-  const [role, setRole] = useState<UserRole>(null);
+  const [role, setRole] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
 
   // --- Tela de Seleção de Perfil (Login) ---
