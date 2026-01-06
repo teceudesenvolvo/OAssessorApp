@@ -1,0 +1,64 @@
+import React from 'react';
+import { Dimensions, StyleSheet, View } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
+
+export const MapScreen = () => {
+  // Coordenadas iniciais (Exemplo: Centro de uma cidade)
+  const initialRegion = {
+    latitude: -26.9136, 
+    longitude: -49.0691,
+    latitudeDelta: 0.02,
+    longitudeDelta: 0.02,
+  };
+
+  // Dados fictícios dos eleitores
+  const eleitores = [
+    { id: 1, nome: 'João Silva', endereco: 'Rua XV de Novembro, 100', lat: -26.9136, lng: -49.0691, status: 'Apoiador' },
+    { id: 2, nome: 'Maria Oliveira', endereco: 'Rua 7 de Setembro, 500', lat: -26.9150, lng: -49.0700, status: 'Indeciso' },
+    { id: 3, nome: 'Carlos Souza', endereco: 'Rua das Palmeiras, 230', lat: -26.9100, lng: -49.0650, status: 'Apoiador' },
+    { id: 4, nome: 'Ana Costa', endereco: 'Rua Amazonas, 1200', lat: -26.9200, lng: -49.0600, status: 'Pendente' },
+    { id: 5, nome: 'Pedro Santos', endereco: 'Rua São Paulo, 45', lat: -26.9180, lng: -49.0750, status: 'Apoiador' },
+    { id: 6, nome: 'Lucia Ferreira', endereco: 'Rua Bahia, 80', lat: -26.9120, lng: -49.0620, status: 'Indeciso' },
+  ];
+
+  // Função para definir a cor do pin baseada no status
+  const getPinColor = (status) => {
+    switch (status) {
+      case 'Apoiador': return '#6EE794'; // Verde do app
+      case 'Indeciso': return '#F59E0B'; // Amarelo/Laranja
+      default: return '#94A3B8'; // Cinza
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <MapView
+        style={styles.map}
+        initialRegion={initialRegion}
+        showsUserLocation={true} // Mostra a localização atual do usuário (precisa de permissão)
+        loadingEnabled={true}
+      >
+        {eleitores.map((eleitor) => (
+          <Marker
+            key={eleitor.id}
+            coordinate={{ latitude: eleitor.lat, longitude: eleitor.lng }}
+            title={eleitor.nome}
+            description={eleitor.endereco}
+            pinColor={getPinColor(eleitor.status)}
+          />
+        ))}
+      </MapView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  map: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height + 50, // +50 para garantir que cubra sob a TabBar transparente
+  },
+});
