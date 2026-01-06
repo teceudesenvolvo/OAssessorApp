@@ -14,8 +14,10 @@ import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { LoginScreen } from './screens/out/LoginScreen';
 
 // Telas com autenticação
+import { AssessorFormScreen } from './screens/AssessorFormScreen';
 import { AssessorScreen } from './screens/AssessorScreen';
 import { EleitorCadastroScreen } from './screens/EleitorCadastroScreen';
+import { EleitorFormScreen } from './screens/EleitorFormScreen';
 import { MapScreen } from './screens/MapScreen';
 import { PerfilScreen } from './screens/PerfilScreen';
 import { PoliticoScreen } from './screens/PoliticoScreen';
@@ -173,6 +175,8 @@ export default function App() {
         <Stack.Screen name="Painel" component={DashboardTabs} initialParams={{ role: 'POLITICO' }} />
         <Stack.Screen name="Assessor" component={DashboardTabs} initialParams={{ role: 'ASSESSOR' }} />
         <Stack.Screen name="Eleitor" component={DashboardTabs} initialParams={{ role: 'ELEITOR' }} />
+        <Stack.Screen name="EleitorForm" component={EleitorFormScreen} />
+        <Stack.Screen name="AssessorForm" component={AssessorFormScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -34,8 +34,8 @@ export const PerfilScreen = ({ navigation }) => {
           <View>
             <Text style={styles.headerSubtitle}>Configurações</Text>
             <Text style={styles.headerTitle}>
-              <Text style={styles.textWhite}>Meu </Text>
-              <Text style={styles.textGreen}>Perfil</Text>
+              <Text style={styles.textGreen}>Meu </Text>
+              <Text style={styles.textWhite}>Perfil</Text>
             </Text>
           </View>
           <TouchableOpacity style={styles.editButton}>
@@ -117,9 +117,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
     position: 'relative',
   },
-  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerSubtitle: { color: '#94a3b8', fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', marginTop: 4 },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 30 },
+  headerSubtitle: { color: '#94a3b8', fontSize: 14, fontWeight: '600', letterSpacing: 1 },
+  headerTitle: { fontSize: 25, fontWeight: 'bold', marginTop: 4 },
   textWhite: { color: colors.white },
   textGreen: { color: colors.primaryGreen },
   editButton: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 16 },

@@ -3,7 +3,7 @@ import { AlertTriangle, BarChart3, Bell, ChevronRight, Gift, Plus, Users } from 
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export const PoliticoScreen = () => {
+export const PoliticoScreen = ({ navigation }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { width, height } = Dimensions.get('window');
 
@@ -41,8 +41,8 @@ export const PoliticoScreen = () => {
           <View style={styles.welcomeView}>
             <Text style={styles.welcomeText}>Bem-vindo, Candidato</Text>
             <Text style={styles.logoText}>
-              <Text style={styles.textWhite}>Iníci</Text>
-              <Text style={styles.textGreen}>o</Text>
+              <Text style={styles.textGreen}>Iníci</Text>
+              <Text style={styles.textWhite}>o</Text>
             </Text>
           </View>
           <TouchableOpacity style={styles.bellButton}>
@@ -89,7 +89,7 @@ export const PoliticoScreen = () => {
           <View style={{ marginTop: 70 }}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Minha Equipe</Text>
-              <TouchableOpacity style={styles.addButtonSmall}>
+              <TouchableOpacity style={styles.addButtonSmall} onPress={() => navigation.navigate('AssessorForm')}>
                 <Plus size={16} color="#fff" />
                 <Text style={styles.addButtonText}>Novo</Text>
               </TouchableOpacity>

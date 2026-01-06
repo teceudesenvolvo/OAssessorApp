@@ -37,8 +37,8 @@ export const TarefasScreen = () => {
           <View>
             <Text style={styles.headerSubtitle}>Organização</Text>
             <Text style={styles.headerTitle}>
-              <Text style={styles.textWhite}>Minhas </Text>
-              <Text style={styles.textGreen}>Tarefas</Text>
+              <Text style={styles.textGreen}>Minhas </Text>
+              <Text style={styles.textWhite}>Tarefas</Text>
             </Text>
           </View>
           <View style={styles.iconBox}>
@@ -133,8 +133,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  headerSubtitle: { color: '#94a3b8', fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', marginTop: 0 },
+  headerSubtitle: { color: '#94a3b8', fontSize: 14, fontWeight: '600', letterSpacing: 1 },
+  headerTitle: { fontSize: 25, fontWeight: 'bold', marginTop: 0 },
   textWhite: { color: colors.white },
   textGreen: { color: colors.primaryGreen },
   iconBox: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 16 },

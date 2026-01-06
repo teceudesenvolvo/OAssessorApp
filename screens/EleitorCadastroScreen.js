@@ -10,10 +10,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { EleitorFormScreen } from './EleitorFormScreen';
 
-export const EleitorCadastroScreen = () => {
-    const [viewMode, setViewMode] = useState('list'); // 'list' | 'form'
+export const EleitorCadastroScreen = ({ navigation }) => {
     const [searchText, setSearchText] = useState('');
 
     // Dados fictícios para a lista
@@ -23,12 +21,6 @@ export const EleitorCadastroScreen = () => {
         { id: '3', nome: 'Ana Costa', bairro: 'Garcia', telefone: '(47) 97777-7777', status: 'Pendente' },
         { id: '4', nome: 'Pedro Oliveira', bairro: 'Itoupava', telefone: '(47) 96666-6666', status: 'Apoiador' },
     ];
-
-    const handleSave = () => {
-        // Aqui entraria a lógica de salvar no backend
-        setViewMode('list');
-        // Resetar campos se necessário...
-    };
 
     const handleExportPDF = async () => {
         const html = `
@@ -77,80 +69,72 @@ export const EleitorCadastroScreen = () => {
         }
     };
 
-    // --- MODO LISTA ---
-    if (viewMode === 'list') {
-        const filteredList = eleitoresList.filter(e => 
-            e.nome.toLowerCase().includes(searchText.toLowerCase()) ||
-            e.bairro.toLowerCase().includes(searchText.toLowerCase())
-        );
+    const filteredList = eleitoresList.filter(e => 
+        e.nome.toLowerCase().includes(searchText.toLowerCase()) ||
+        e.bairro.toLowerCase().includes(searchText.toLowerCase())
+    );
 
-        return (
-            <View style={styles.container}>
-                <View style={styles.header}>
-                    <View style={styles.headerTopRow}>
-                        <View>
-                            <Text style={styles.headerSubtitle}>Gerenciamento</Text>
-                            <Text style={styles.logoText}>
-                                <Text style={styles.textWhite}>Meus </Text>
-                                <Text style={styles.textGreen}>Eleitores</Text>
-                            </Text>
-                        </View>
-                        <View style={styles.iconBox}>
-                            <UserPlus size={28} color="#6EE794" />
-                        </View>
+    return (
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <View style={styles.headerTopRow}>
+                    <View>
+                        <Text style={styles.headerSubtitle}>Gerenciamento</Text>
+                        <Text style={styles.logoText}>
+                            <Text style={styles.textGreen}>Meus </Text>
+                            <Text style={styles.textWhite}>Eleitores</Text>
+                        </Text>
                     </View>
-                    
-                    {/* Barra de Pesquisa */}
-                    <View style={styles.searchContainer}>
-                        <Search size={20} color="#94a3b8" style={{ marginRight: 10 }} />
-                        <TextInput 
-                            style={styles.searchInput}
-                            placeholder="Buscar por nome ou bairro..."
-                            placeholderTextColor="#94a3b8"
-                            value={searchText}
-                            onChangeText={setSearchText}
-                        />
-                        <TouchableOpacity style={styles.filterButton}>
-                            <Filter size={20} color="white" />
-                        </TouchableOpacity>
+                    <View style={styles.iconBox}>
+                        <UserPlus size={28} color="#6EE794" />
                     </View>
                 </View>
+                    
+                {/* Barra de Pesquisa */}
+                <View style={styles.searchContainer}>
+                    <Search size={20} color="#94a3b8" style={{ marginRight: 10 }} />
+                    <TextInput 
+                        style={styles.searchInput}
+                        placeholder="Buscar por nome ou bairro..."
+                        placeholderTextColor="#94a3b8"
+                        value={searchText}
+                        onChangeText={setSearchText}
+                    />
+                    <TouchableOpacity style={styles.filterButton}>
+                        <Filter size={20} color="white" />
+                    </TouchableOpacity>
+                </View>
+            </View>
 
-                <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100, paddingTop: 20 }}>
-                    {filteredList.map(item => (
-                        <View key={item.id} style={styles.eleitorCard}>
-                            <View style={styles.eleitorInfo}>
-                                <Text style={styles.eleitorName}>{item.nome}</Text>
-                                <View style={styles.eleitorMeta}>
-                                    <MapPin size={14} color="#94a3b8" style={{ marginRight: 4 }} />
-                                    <Text style={styles.eleitorText}>{item.bairro}</Text>
-                                </View>
-                                <View style={styles.eleitorMeta}>
-                                    <Phone size={14} color="#94a3b8" style={{ marginRight: 4 }} />
-                                    <Text style={styles.eleitorText}>{item.telefone}</Text>
-                                </View>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100, paddingTop: 20 }}>
+                {filteredList.map(item => (
+                    <View key={item.id} style={styles.eleitorCard}>
+                        <View style={styles.eleitorInfo}>
+                            <Text style={styles.eleitorName}>{item.nome}</Text>
+                            <View style={styles.eleitorMeta}>
+                                <MapPin size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                                <Text style={styles.eleitorText}>{item.bairro}</Text>
                             </View>
-                            <View style={[styles.statusBadge, { backgroundColor: item.status === 'Apoiador' ? '#dcfce7' : '#f1f5f9' }]}>
-                                <Text style={[styles.statusText, { color: item.status === 'Apoiador' ? '#166534' : '#64748b' }]}>{item.status}</Text>
+                            <View style={styles.eleitorMeta}>
+                                <Phone size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                                <Text style={styles.eleitorText}>{item.telefone}</Text>
                             </View>
                         </View>
-                    ))}
-                </ScrollView>
+                        <View style={[styles.statusBadge, { backgroundColor: item.status === 'Apoiador' ? '#dcfce7' : '#f1f5f9' }]}>
+                            <Text style={[styles.statusText, { color: item.status === 'Apoiador' ? '#166534' : '#64748b' }]}>{item.status}</Text>
+                        </View>
+                    </View>
+                ))}
+            </ScrollView>
 
-                <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white' }]} onPress={handleExportPDF}>
-                    <FileText size={24} color="#6EE794" />
-                </TouchableOpacity>
+            <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white' }]} onPress={handleExportPDF}>
+                <FileText size={24} color="#6EE794" />
+            </TouchableOpacity>
 
-                <TouchableOpacity style={styles.fab} onPress={() => setViewMode('form')}>
-                    <Plus size={24} color="white" />
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
-    // --- MODO FORMULÁRIO ---
-    return (
-        <EleitorFormScreen onBack={() => setViewMode('list')} onSave={handleSave} />
+            <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('EleitorForm')}>
+                <Plus size={24} color="white" />
+            </TouchableOpacity>
+        </View>
     );
 };
 
@@ -178,13 +162,13 @@ const styles = StyleSheet.create({
         elevation: 8,
         zIndex: 10,
     },
-    headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 0 },
+    headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 20 },
     headerSubtitle: { color: '#94a3b8', fontSize: 14, fontWeight: '600', letterSpacing: 1 },
-    headerTitle: { color: colors.white, fontSize: 28, fontWeight: 'bold', marginTop: 4 },
+    headerTitle: { color: colors.white, fontSize: 20, fontWeight: 'bold', marginTop: 4 },
     iconBox: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 16 },
-    content: { flex: 1, marginTop: -20, paddingHorizontal: 20 },
+    content: { flex: 1, marginTop: 0, paddingHorizontal: 20 },
     logoText: {
-        fontSize: 32,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     textGreen: {

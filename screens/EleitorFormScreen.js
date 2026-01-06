@@ -1,14 +1,14 @@
 import { ArrowLeft, ArrowRight, Save, UserPlus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 // Funções de Máscara
@@ -61,7 +61,7 @@ const maskZonaSecao = (value) => {
     return v;
 };
 
-export const EleitorFormScreen = ({ onBack, onSave }) => {
+export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
     const [step, setStep] = useState(1);
 
     // Etapa 1: Dados Pessoais
@@ -76,6 +76,8 @@ export const EleitorFormScreen = ({ onBack, onSave }) => {
     const [endereco, setEndereco] = useState('');
     const [numero, setNumero] = useState('');
     const [bairro, setBairro] = useState('');
+    const [cidade, setCidade] = useState('');
+    const [estado, setEstado] = useState('');
     const [titulo, setTitulo] = useState('');
     const [zonaSecao, setZonaSecao] = useState('');
 
@@ -88,10 +90,12 @@ export const EleitorFormScreen = ({ onBack, onSave }) => {
             try {
                 const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
                 const data = await response.json();
-                
+
                 if (!data.erro) {
                     setEndereco(data.logradouro || '');
                     setBairro(data.bairro || '');
+                    setCidade(data.localidade || '');
+                    setEstado(data.uf || '');
                 }
             } catch (error) {
                 console.log('Erro ao buscar CEP:', error);
@@ -102,6 +106,7 @@ export const EleitorFormScreen = ({ onBack, onSave }) => {
     const handleSaveInternal = () => {
         // Aqui você pode processar os dados antes de salvar
         if (onSave) onSave();
+        else navigation.goBack();
     };
 
     return (
@@ -110,15 +115,13 @@ export const EleitorFormScreen = ({ onBack, onSave }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={onBack} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                            <ArrowLeft size={16} color="#94a3b8" style={{ marginRight: 4 }} />
-                            <Text style={{ color: '#94a3b8', fontWeight: 'bold' }}>Voltar</Text>
+                        <TouchableOpacity onPress={onBack || (() => navigation.goBack())} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                            <ArrowLeft size={20} color="#fff" style={{ marginRight: 4, fontSize: 10 }} />
+                            <Text style={styles.logoText}>
+                                <Text style={styles.textGreen}>Novo</Text>
+                                <Text style={styles.textWhite}> Eleitor</Text>
+                            </Text>
                         </TouchableOpacity>
-                        <Text style={styles.headerSubtitle}>Etapa {step} de 2</Text>
-                        <Text style={styles.logoText}>
-                            <Text style={styles.textWhite}>Novo</Text>
-                            <Text style={styles.textGreen}> Eleitor</Text>
-                        </Text>
                     </View>
                     <View style={styles.iconBox}>
                         <UserPlus size={28} color="#6EE794" />
@@ -255,6 +258,30 @@ export const EleitorFormScreen = ({ onBack, onSave }) => {
                                     </View>
                                 </View>
 
+                                <View style={styles.row}>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <Text style={styles.label}>Cidade</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Cidade"
+                                            placeholderTextColor="#64748b"
+                                            value={cidade}
+                                            onChangeText={setCidade}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 0.3, marginLeft: 8 }}>
+                                        <Text style={styles.label}>UF</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="UF"
+                                            placeholderTextColor="#64748b"
+                                            maxLength={2}
+                                            value={estado}
+                                            onChangeText={setEstado}
+                                        />
+                                    </View>
+                                </View>
+
                                 <Text style={styles.sectionTitle}>Dados Eleitorais</Text>
 
                                 <Text style={styles.label}>Título de Eleitor (Opcional)</Text>
@@ -283,7 +310,7 @@ export const EleitorFormScreen = ({ onBack, onSave }) => {
                                     <TouchableOpacity style={styles.backButton} onPress={() => setStep(1)}>
                                         <ArrowLeft size={20} color="#64748b" />
                                     </TouchableOpacity>
-                                    
+
                                     <TouchableOpacity style={[styles.button, { flex: 1, marginTop: 0, marginLeft: 12 }]} onPress={handleSaveInternal}>
                                         <Save size={20} color="white" style={{ marginRight: 8 }} />
                                         <Text style={styles.buttonText}>Salvar</Text>
@@ -338,7 +365,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
     },
     logoText: {
-        fontSize: 32,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     textGreen: {
