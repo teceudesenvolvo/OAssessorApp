@@ -3,7 +3,7 @@ import { AlertTriangle, BarChart3, Bell, Users } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export const AssessorScreen = () => {
+export const AssessorScreen = ({ navigation }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { width, height } = Dimensions.get('window');
 
@@ -33,7 +33,7 @@ export const AssessorScreen = () => {
               <Text style={styles.textGreen}>o</Text>
             </Text>
           </View>
-          <TouchableOpacity style={styles.bellButton}>
+          <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
             <Bell size={24} color="white" />
           </TouchableOpacity>
         </View>

@@ -45,7 +45,7 @@ export const PoliticoScreen = ({ navigation }) => {
               <Text style={styles.textWhite}>o</Text>
             </Text>
           </View>
-          <TouchableOpacity style={styles.bellButton}>
+          <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
             <Bell size={24} color="white" />
           </TouchableOpacity>
         </View>

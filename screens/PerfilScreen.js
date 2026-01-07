@@ -13,7 +13,7 @@ export const PerfilScreen = ({ navigation }) => {
 
   const menuItems = [
     { id: '1', icon: User, label: 'Meus Dados', description: 'Gerenciar informações pessoais' },
-    { id: '2', icon: Bell, label: 'Notificações', description: 'Preferências de alertas' },
+    { id: '2', icon: Bell, label: 'Notificações', description: 'Preferências de alertas', route: 'Notificacoes' },
     { id: '3', icon: Shield, label: 'Segurança', description: 'Senha e autenticação' },
     { id: '4', icon: HelpCircle, label: 'Ajuda e Suporte', description: 'Fale conosco' },
   ];
@@ -66,7 +66,11 @@ export const PerfilScreen = ({ navigation }) => {
       >
         <View style={styles.menuContainer}>
             {menuItems.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.menuItem}>
+                <TouchableOpacity 
+                  key={item.id} 
+                  style={styles.menuItem}
+                  onPress={() => item.route && navigation.navigate(item.route)}
+                >
                     <View style={styles.menuIconBox}>
                         <item.icon size={24} color="#64748b" />
                     </View>

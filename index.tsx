@@ -14,13 +14,15 @@ import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { LoginScreen } from './screens/out/LoginScreen';
 
 // Telas com autenticação
-import { AssessorFormScreen } from './screens/AssessorFormScreen';
 import { AssessorScreen } from './screens/AssessorScreen';
 import { EleitorCadastroScreen } from './screens/EleitorCadastroScreen';
-import { EleitorFormScreen } from './screens/EleitorFormScreen';
 import { MapScreen } from './screens/MapScreen';
 import { PerfilScreen } from './screens/PerfilScreen';
 import { PoliticoScreen } from './screens/PoliticoScreen';
+import { AssessorFormScreen } from './screens/subpages/AssessorFormScreen';
+import { EleitorFormScreen } from './screens/subpages/EleitorFormScreen';
+import { NotificacoesScreen } from './screens/subpages/NotificacoesScreen';
+import { TarefasFormScreen } from './screens/subpages/TarefasFormScreen';
 import { TarefasScreen } from './screens/TarefasScreen';
 
 const Stack = createNativeStackNavigator();
@@ -177,6 +179,8 @@ export default function App() {
         <Stack.Screen name="Eleitor" component={DashboardTabs} initialParams={{ role: 'ELEITOR' }} />
         <Stack.Screen name="EleitorForm" component={EleitorFormScreen} />
         <Stack.Screen name="AssessorForm" component={AssessorFormScreen} />
+        <Stack.Screen name="TarefasForm" component={TarefasFormScreen} />
+        <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

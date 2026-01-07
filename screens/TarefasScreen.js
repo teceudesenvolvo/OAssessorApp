@@ -2,7 +2,7 @@ import { Calendar, CheckCircle, Circle, Clock, Plus } from 'lucide-react-native'
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export const TarefasScreen = () => {
+export const TarefasScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('pending'); // 'pending' | 'done'
 
   const [tasks, setTasks] = useState([
@@ -102,7 +102,7 @@ export const TarefasScreen = () => {
       </ScrollView>
 
       {/* FAB Add Button */}
-      <TouchableOpacity style={styles.fab}>
+      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('TarefasForm')}>
         <Plus size={24} color="white" />
       </TouchableOpacity>
     </View>
