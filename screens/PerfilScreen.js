@@ -12,10 +12,10 @@ export const PerfilScreen = ({ navigation }) => {
   };
 
   const menuItems = [
-    { id: '1', icon: User, label: 'Meus Dados', description: 'Gerenciar informações pessoais' },
-    { id: '2', icon: Bell, label: 'Notificações', description: 'Preferências de alertas', route: 'Notificacoes' },
-    { id: '3', icon: Shield, label: 'Segurança', description: 'Senha e autenticação' },
-    { id: '4', icon: HelpCircle, label: 'Ajuda e Suporte', description: 'Fale conosco' },
+    { id: '1', icon: User, label: 'Meus Dados', description: 'Gerenciar informações pessoais', route: 'EditProfile' },
+    { id: '2', icon: Bell, label: 'Notificações', description: 'Preferências de alertas', route: 'NotificationSettings' },
+    { id: '3', icon: Shield, label: 'Segurança', description: 'Senha e autenticação', route: 'Security' },
+    { id: '4', icon: HelpCircle, label: 'Ajuda e Suporte', description: 'Fale conosco', route: 'Help' },
   ];
 
   const handleLogout = () => {

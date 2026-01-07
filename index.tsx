@@ -19,11 +19,17 @@ import { EleitorCadastroScreen } from './screens/EleitorCadastroScreen';
 import { MapScreen } from './screens/MapScreen';
 import { PerfilScreen } from './screens/PerfilScreen';
 import { PoliticoScreen } from './screens/PoliticoScreen';
+import { TarefasScreen } from './screens/TarefasScreen';
+// SubPages
 import { AssessorFormScreen } from './screens/subpages/AssessorFormScreen';
 import { EleitorFormScreen } from './screens/subpages/EleitorFormScreen';
 import { NotificacoesScreen } from './screens/subpages/NotificacoesScreen';
 import { TarefasFormScreen } from './screens/subpages/TarefasFormScreen';
-import { TarefasScreen } from './screens/TarefasScreen';
+// ConfigPages
+import { EditProfileScreen } from './screens/configPages/EditProfileScreen';
+import { HelpScreen } from './screens/configPages/HelpScreen';
+import { NotificationSettingsScreen } from './screens/configPages/NotificationSettingsScreen';
+import { SecurityScreen } from './screens/configPages/SecurityScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -181,6 +187,10 @@ export default function App() {
         <Stack.Screen name="AssessorForm" component={AssessorFormScreen} />
         <Stack.Screen name="TarefasForm" component={TarefasFormScreen} />
         <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="Security" component={SecurityScreen} />
+        <Stack.Screen name="Help" component={HelpScreen} />
+        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
