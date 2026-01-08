@@ -1,15 +1,18 @@
 import { ArrowLeft, Save, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import { API_BASE_URL } from '../../ApiConfig';
 
 // Funções de Máscara (reutilizando lógica simples)
 const maskCPF = (value) => {
@@ -35,10 +38,45 @@ export const AssessorFormScreen = ({ navigation }) => {
     const [cpf, setCpf] = useState('');
     const [email, setEmail] = useState('');
     const [telefone, setTelefone] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSave = () => {
-        // Lógica de salvamento aqui
-        navigation.goBack();
+    const handleSave = async () => {
+        if (!nome || !email) {
+            Alert.alert('Atenção', 'Por favor, preencha os campos obrigatórios (Nome e Email).');
+            return;
+        }
+
+        setLoading(true);
+        // ID do usuário logado (Candidato) que está criando o assessor
+        const creatorId = "user_candidato_123";
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/assessores.json`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    nome,
+                    cargo,
+                    cpf,
+                    email,
+                    telefone,
+                    tipoUser: "assessor",
+                    creatorId,
+                    createdAt: new Date().toISOString(),
+                }),
+            });
+
+            if (!response.ok) throw new Error('Erro ao salvar');
+
+            Alert.alert('Sucesso', 'Assessor cadastrado com sucesso!');
+        } catch (error) {
+            Alert.alert('Erro', 'Não foi possível cadastrar o assessor. Verifique sua conexão.');
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -124,9 +162,15 @@ export const AssessorFormScreen = ({ navigation }) => {
                             onChangeText={setEmail}
                         />
 
-                        <TouchableOpacity style={styles.button} onPress={handleSave}>
-                            <Save size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text style={styles.buttonText}>Salvar Equipe</Text>
+                        <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <>
+                                    <Save size={20} color="white" style={{ marginRight: 8 }} />
+                                    <Text style={styles.buttonText}>Cadastrar</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </ScrollView>

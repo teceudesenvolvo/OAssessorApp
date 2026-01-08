@@ -1,6 +1,8 @@
 import { ArrowLeft, ArrowRight, Save, UserPlus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -10,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { API_BASE_URL } from '../../ApiConfig';
 
 // Funções de Máscara
 const maskCPF = (value) => {
@@ -80,6 +83,7 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
     const [estado, setEstado] = useState('');
     const [titulo, setTitulo] = useState('');
     const [zonaSecao, setZonaSecao] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const handleCepChange = async (text) => {
         const maskedCep = maskCEP(text);
@@ -103,10 +107,49 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
         }
     };
 
-    const handleSaveInternal = () => {
-        // Aqui você pode processar os dados antes de salvar
-        if (onSave) onSave();
-        else navigation.goBack();
+    const handleSaveInternal = async () => {
+        if (!nome || !cpf) {
+            Alert.alert('Atenção', 'Por favor, preencha os campos obrigatórios (Nome e CPF).');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const payload = {
+                nome,
+                cpf,
+                nascimento,
+                email,
+                telefone,
+                cep,
+                endereco,
+                numero,
+                bairro,
+                cidade,
+                estado,
+                titulo,
+                zonaSecao,
+                createdAt: new Date().toISOString(),
+                tipoUser: 'eleitor'
+            };
+
+            const response = await fetch(`${API_BASE_URL}/eleitores.json`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error('Falha ao salvar');
+
+            Alert.alert('Sucesso', 'Eleitor cadastrado com sucesso!');
+            if (onSave) onSave();
+            else navigation.goBack();
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Erro', 'Não foi possível salvar o eleitor. Verifique sua conexão.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -311,9 +354,15 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
                                         <ArrowLeft size={20} color="#64748b" />
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity style={[styles.button, { flex: 1, marginTop: 0, marginLeft: 12 }]} onPress={handleSaveInternal}>
-                                        <Save size={20} color="white" style={{ marginRight: 8 }} />
-                                        <Text style={styles.buttonText}>Salvar</Text>
+                                    <TouchableOpacity style={[styles.button, { flex: 1, marginTop: 0, marginLeft: 12 }]} onPress={handleSaveInternal} disabled={loading}>
+                                        {loading ? (
+                                            <ActivityIndicator color="white" />
+                                        ) : (
+                                            <>
+                                                <Save size={20} color="white" style={{ marginRight: 8 }} />
+                                                <Text style={styles.buttonText}>Salvar</Text>
+                                            </>
+                                        )}
                                     </TouchableOpacity>
                                 </View>
                             </>

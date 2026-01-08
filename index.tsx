@@ -103,7 +103,7 @@ function DashboardTabs({ route, navigation }) {
             bottom: 0, // Define a posição base fixa
             left: 10,
             right: 10,
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(255, 255, 255, 0.5)',
             borderTopWidth: 0,
             height: 90,
             borderRadius: 40,

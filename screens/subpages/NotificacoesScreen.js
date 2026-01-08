@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 25, fontWeight: 'bold' },
   textGreen: { color: colors.primaryGreen, fontWeight: 'bold' },
   textWhite: { color: colors.white },
-  markAllButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 16, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  markAllButton: { display: 'none', Direction: 'row', alignItems: 'center', alignSelf: 'center', marginTop: 16, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   markAllText: { color: '#6EE794', fontSize: 12, fontWeight: '600', marginRight: 6 },
   
   content: { flex: 1, padding: 20 },
