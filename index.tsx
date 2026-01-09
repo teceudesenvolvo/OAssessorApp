@@ -4,9 +4,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { registerRootComponent } from 'expo';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Calendar, Home, Map as MapIcon, PlusCircle, User, Workflow } from 'lucide-react-native';
-import React from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Animated, Platform, StyleSheet, Text, View } from 'react-native';
 
 // Importação das telas
 
@@ -26,6 +27,7 @@ import { EleitorFormScreen } from './screens/subpages/EleitorFormScreen';
 import { NotificacoesScreen } from './screens/subpages/NotificacoesScreen';
 import { TarefasFormScreen } from './screens/subpages/TarefasFormScreen';
 // ConfigPages
+import { auth } from './ApiConfig';
 import { EditProfileScreen } from './screens/configPages/EditProfileScreen';
 import { HelpScreen } from './screens/configPages/HelpScreen';
 import { NotificationSettingsScreen } from './screens/configPages/NotificationSettingsScreen';
@@ -176,9 +178,28 @@ function DashboardTabs({ route, navigation }) {
 }
 
 export default function App() {
+  const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (initializing) setInitializing(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  if (initializing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#101422' }}>
+        <ActivityIndicator size="large" color="#6EE794" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={user ? "Painel" : "Login"}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Painel" component={DashboardTabs} initialParams={{ role: 'POLITICO' }} />
         <Stack.Screen name="Assessor" component={DashboardTabs} initialParams={{ role: 'ASSESSOR' }} />

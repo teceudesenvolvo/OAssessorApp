@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL } from '../../ApiConfig';
+import { API_BASE_URL, auth } from '../../ApiConfig';
 
 // Funções de Máscara (reutilizando lógica simples)
 const maskCPF = (value) => {
@@ -48,7 +48,7 @@ export const AssessorFormScreen = ({ navigation }) => {
 
         setLoading(true);
         // ID do usuário logado (Candidato) que está criando o assessor
-        const creatorId = "user_candidato_123";
+        const creatorId = auth.currentUser?.uid;
 
         try {
             const response = await fetch(`${API_BASE_URL}/assessores.json`, {

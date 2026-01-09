@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL } from '../../ApiConfig';
+import { API_BASE_URL, auth } from '../../ApiConfig';
 
 // Funções de Máscara
 const maskCPF = (value) => {
@@ -114,6 +114,9 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
         }
 
         setLoading(true);
+        // ID do usuário logado que está criando o eleitor
+        const creatorId = auth.currentUser?.uid;
+
         try {
             const payload = {
                 nome,
@@ -130,7 +133,8 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
                 titulo,
                 zonaSecao,
                 createdAt: new Date().toISOString(),
-                tipoUser: 'eleitor'
+                tipoUser: 'cidadao',
+                creatorId
             };
 
             const response = await fetch(`${API_BASE_URL}/eleitores.json`, {

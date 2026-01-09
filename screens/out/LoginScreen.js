@@ -1,5 +1,8 @@
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -12,10 +15,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { auth } from '../../ApiConfig';
 
 export const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   
   // Configuração da animação
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -24,7 +29,31 @@ export const LoginScreen = ({ navigation }) => {
   const { width, height } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
   
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Erro', 'Por favor, preencha email e senha.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Se o login for bem-sucedido, inicia a animação
+      startAnimationAndNavigate();
+    } catch (error) {
+      console.error(error);
+      let msg = 'Ocorreu um erro ao fazer login.';
+      if (error.code === 'auth/invalid-email') msg = 'Email inválido.';
+      if (error.code === 'auth/user-not-found') msg = 'Usuário não encontrado.';
+      if (error.code === 'auth/wrong-password') msg = 'Senha incorreta.';
+      if (error.code === 'auth/invalid-credential') msg = 'Credenciais inválidas.';
+      Alert.alert('Falha no Login', msg);
+      setLoading(false);
+    }
+  };
+
+  const startAnimationAndNavigate = () => {
     if (buttonRef.current) {
       buttonRef.current.measure((fx, fy, w, h, px, py) => {
         // Calcula o centro do botão
@@ -52,6 +81,7 @@ export const LoginScreen = ({ navigation }) => {
           useNativeDriver: true,
         }).start(() => {
           navigation.replace('Painel');
+          setLoading(false);
         });
       });
     }
@@ -103,8 +133,12 @@ export const LoginScreen = ({ navigation }) => {
             onChangeText={setPassword}
           />
 
-          <TouchableOpacity ref={buttonRef} style={styles.button} onPress={handleLogin}>
-            <Text style={styles.buttonText}>Entrar</Text>
+          <TouchableOpacity ref={buttonRef} style={styles.button} onPress={handleLogin} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>Entrar</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.forgotPasswordContainer}>
