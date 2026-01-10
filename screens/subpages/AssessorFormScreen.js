@@ -49,6 +49,19 @@ export const AssessorFormScreen = ({ navigation }) => {
         setLoading(true);
         // ID do usuário logado (Candidato) que está criando o assessor
         const creatorId = auth.currentUser?.uid;
+        const adminId = creatorId; // O usuário logado é o admin
+
+        const assessorData = {
+            nome,
+            cargo,
+            cpf,
+            email,
+            telefone,
+            tipoUser: "assessor",
+            creatorId,
+            adminId,
+            createdAt: new Date().toISOString(),
+        };
 
         try {
             const response = await fetch(`${API_BASE_URL}/assessores.json`, {
@@ -56,21 +69,23 @@ export const AssessorFormScreen = ({ navigation }) => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    nome,
-                    cargo,
-                    cpf,
-                    email,
-                    telefone,
-                    tipoUser: "assessor",
-                    creatorId,
-                    createdAt: new Date().toISOString(),
-                }),
+                body: JSON.stringify(assessorData),
             });
 
             if (!response.ok) throw new Error('Erro ao salvar');
 
+            const data = await response.json();
+            const newId = data.name;
+
+            // Salvar também na coleção users usando o ID gerado
+            await fetch(`${API_BASE_URL}/users/${newId}.json`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(assessorData)
+            });
+
             Alert.alert('Sucesso', 'Assessor cadastrado com sucesso!');
+            navigation.goBack();
         } catch (error) {
             Alert.alert('Erro', 'Não foi possível cadastrar o assessor. Verifique sua conexão.');
             console.error(error);

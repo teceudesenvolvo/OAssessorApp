@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, StyleSheet, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { API_BASE_URL, auth } from '../ApiConfig';
 
 export const MapScreen = () => {
   const mapRef = useRef(null);
@@ -34,12 +35,42 @@ export const MapScreen = () => {
       setRegion(userRegion);
       mapRef.current?.animateToRegion(userRegion, 1000);
 
+      // Buscar eleitores do Firebase
+      let myEleitores = [];
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          const response = await fetch(`${API_BASE_URL}/eleitores.json`);
+          const data = await response.json();
+          if (data) {
+            myEleitores = Object.keys(data)
+              .map(key => ({ id: key, ...data[key] }))
+              .filter(item => item.creatorId === user.uid);
+          }
+        }
+      } catch (error) {
+        console.log('Erro ao buscar eleitores:', error);
+      }
+
       // Geocodificação dos endereços dos eleitores
       const loadedMarkers = [];
-      for (const eleitor of eleitores) {
+      for (const eleitor of myEleitores) {
         try {
           // Tenta obter as coordenadas a partir do endereço
-          const geocoded = await Location.geocodeAsync(eleitor.endereco);
+          // Monta o endereço completo limpando campos vazios
+          const addressParts = [
+            eleitor.endereco,
+            eleitor.numero,
+            eleitor.bairro,
+            eleitor.cidade,
+            eleitor.estado
+          ].filter(part => part && part.trim() !== '');
+
+          const fullAddress = addressParts.join(', ');
+
+          if (fullAddress.length < 5) continue; // Pula se o endereço for muito curto
+
+          const geocoded = await Location.geocodeAsync(fullAddress);
           if (geocoded.length > 0) {
             loadedMarkers.push({
               ...eleitor,
@@ -55,16 +86,6 @@ export const MapScreen = () => {
       setLoading(false);
     })();
   }, []);
-
-  // Dados fictícios dos eleitores (Simulando dados vindos do formulário, apenas com endereço)
-  const eleitores = [
-    { id: 1, nome: 'João Silva', endereco: 'Rua XV de Novembro, 100, Blumenau - SC', status: 'Apoiador' },
-    { id: 2, nome: 'Maria Oliveira', endereco: 'Rua 7 de Setembro, 500, Blumenau - SC', status: 'Indeciso' },
-    { id: 3, nome: 'Carlos Souza', endereco: 'Rua das Palmeiras, 230, Blumenau - SC', status: 'Apoiador' },
-    { id: 4, nome: 'Ana Costa', endereco: 'Rua Amazonas, 1200, Blumenau - SC', status: 'Pendente' },
-    { id: 5, nome: 'Pedro Santos', endereco: 'Rua São Paulo, 45, Blumenau - SC', status: 'Apoiador' },
-    { id: 6, nome: 'Lucia Ferreira', endereco: 'Rua Bahia, 80, Blumenau - SC', status: 'Indeciso' },
-  ];
 
   // Função para definir a cor do pin baseada no status
   const getPinColor = (status) => {

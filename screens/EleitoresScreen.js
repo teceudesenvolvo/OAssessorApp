@@ -1,8 +1,11 @@
+import { useFocusEffect } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { FileText, Filter, MapPin, Phone, Plus, Search, UserPlus } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -10,17 +13,54 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { API_BASE_URL, auth } from '../ApiConfig';
 
 export const EleitorCadastroScreen = ({ navigation }) => {
     const [searchText, setSearchText] = useState('');
+    const [eleitores, setEleitores] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [plano, setPlano] = useState('');
+    const LIMIT = 2000;
 
-    // Dados fictícios para a lista
-    const eleitoresList = [
-        { id: '1', nome: 'Maria Silva', bairro: 'Centro', telefone: '(47) 99999-9999', status: 'Apoiador' },
-        { id: '2', nome: 'João Santos', bairro: 'Velha', telefone: '(47) 98888-8888', status: 'Indeciso' },
-        { id: '3', nome: 'Ana Costa', bairro: 'Garcia', telefone: '(47) 97777-7777', status: 'Pendente' },
-        { id: '4', nome: 'Pedro Oliveira', bairro: 'Itoupava', telefone: '(47) 96666-6666', status: 'Apoiador' },
-    ];
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const user = auth.currentUser;
+            if (!user) return;
+
+            // 1. Buscar Eleitores e filtrar pelo ID do usuário logado
+            const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json`);
+            const dataEleitores = await responseEleitores.json();
+            
+            const loadedEleitores = [];
+            if (dataEleitores) {
+                for (const key in dataEleitores) {
+                    if (dataEleitores[key].creatorId === user.uid) {
+                        loadedEleitores.push({ id: key, ...dataEleitores[key] });
+                    }
+                }
+            }
+            setEleitores(loadedEleitores);
+
+            // 2. Buscar dados do usuário para pegar o tipoPlano
+            // Assumindo que os usuários estão salvos em users/{uid}
+            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+            const dataUser = await responseUser.json();
+            if (dataUser && dataUser.tipoPlano) {
+                setPlano(dataUser.tipoPlano);
+            }
+
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Erro', 'Não foi possível carregar os dados.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useFocusEffect(useCallback(() => {
+        fetchData();
+    }, []));
 
     const handleExportPDF = async () => {
         const html = `
@@ -47,7 +87,7 @@ export const EleitorCadastroScreen = ({ navigation }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            ${eleitoresList.map(item => `
+                            ${eleitores.map(item => `
                                 <tr>
                                     <td>${item.nome}</td>
                                     <td>${item.bairro}</td>
@@ -69,7 +109,7 @@ export const EleitorCadastroScreen = ({ navigation }) => {
         }
     };
 
-    const filteredList = eleitoresList.filter(e => 
+    const filteredList = eleitores.filter(e => 
         e.nome.toLowerCase().includes(searchText.toLowerCase()) ||
         e.bairro.toLowerCase().includes(searchText.toLowerCase())
     );
@@ -84,6 +124,17 @@ export const EleitorCadastroScreen = ({ navigation }) => {
                             <Text style={styles.textGreen}>Meus </Text>
                             <Text style={styles.textWhite}>Eleitores</Text>
                         </Text>
+                        <Text style={styles.limitText}>
+                            {eleitores.length} de {LIMIT} cadastros
+                        </Text>
+                        <View style={styles.progressBarContainer}>
+                            <View 
+                                style={[
+                                    styles.progressBarFill, 
+                                    { width: `${Math.min((eleitores.length / LIMIT) * 100, 100)}%` }
+                                ]} 
+                            />
+                        </View>
                     </View>
                     <View style={styles.iconBox}>
                         <UserPlus size={28} color="#6EE794" />
@@ -107,24 +158,32 @@ export const EleitorCadastroScreen = ({ navigation }) => {
             </View>
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100, paddingTop: 20 }}>
-                {filteredList.map(item => (
-                    <View key={item.id} style={styles.eleitorCard}>
-                        <View style={styles.eleitorInfo}>
-                            <Text style={styles.eleitorName}>{item.nome}</Text>
-                            <View style={styles.eleitorMeta}>
-                                <MapPin size={14} color="#94a3b8" style={{ marginRight: 4 }} />
-                                <Text style={styles.eleitorText}>{item.bairro}</Text>
-                            </View>
-                            <View style={styles.eleitorMeta}>
-                                <Phone size={14} color="#94a3b8" style={{ marginRight: 4 }} />
-                                <Text style={styles.eleitorText}>{item.telefone}</Text>
-                            </View>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: item.status === 'Apoiador' ? '#dcfce7' : '#f1f5f9' }]}>
-                            <Text style={[styles.statusText, { color: item.status === 'Apoiador' ? '#166534' : '#64748b' }]}>{item.status}</Text>
-                        </View>
+                {loading ? (
+                    <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 40 }} />
+                ) : filteredList.length === 0 ? (
+                    <View style={{ alignItems: 'center', marginTop: 40 }}>
+                        <Text style={{ color: '#94a3b8' }}>Nenhum eleitor encontrado.</Text>
                     </View>
-                ))}
+                ) : (
+                    filteredList.map(item => (
+                        <TouchableOpacity key={item.id} style={styles.eleitorCard} onPress={() => navigation.navigate('EleitorEdit', { eleitor: item })}>
+                            <View style={styles.eleitorInfo}>
+                                <Text style={styles.eleitorName}>{item.nome}</Text>
+                                <View style={styles.eleitorMeta}>
+                                    <MapPin size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                                    <Text style={styles.eleitorText}>{item.bairro || 'Sem bairro'}</Text>
+                                </View>
+                                <View style={styles.eleitorMeta}>
+                                    <Phone size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                                    <Text style={styles.eleitorText}>{item.telefone || 'Sem telefone'}</Text>
+                                </View>
+                            </View>
+                            <View style={[styles.statusBadge, { backgroundColor: item.status === 'Apoiador' ? '#dcfce7' : '#f1f5f9' }]}>
+                                <Text style={[styles.statusText, { color: item.status === 'Apoiador' ? '#166534' : '#64748b' }]}>{item.status || 'Novo'}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))
+                )}
             </ScrollView>
 
             <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white' }]} onPress={handleExportPDF}>
@@ -177,6 +236,19 @@ const styles = StyleSheet.create({
     },
     textWhite: {
         color: colors.white,
+    },
+    limitText: { color: '#94a3b8', fontSize: 12, marginTop: 4, fontWeight: '600' },
+    progressBarContainer: {
+        height: 6,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 3,
+        marginTop: 8,
+        width: 160,
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#6EE794',
+        borderRadius: 3,
     },
     searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 12, paddingHorizontal: 16, height: 50, marginTop: 20 },
     searchInput: { flex: 1, height: 50, color: colors.textDark },

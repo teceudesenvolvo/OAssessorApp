@@ -16,15 +16,17 @@ import { LoginScreen } from './screens/out/LoginScreen';
 
 // Telas com autenticação
 import { AssessorScreen } from './screens/AssessorScreen';
-import { EleitorCadastroScreen } from './screens/EleitorCadastroScreen';
+import { EleitorCadastroScreen } from './screens/EleitoresScreen';
 import { MapScreen } from './screens/MapScreen';
 import { PerfilScreen } from './screens/PerfilScreen';
 import { PoliticoScreen } from './screens/PoliticoScreen';
 import { TarefasScreen } from './screens/TarefasScreen';
 // SubPages
 import { AssessorFormScreen } from './screens/subpages/AssessorFormScreen';
+import { EleitorEditScreen } from './screens/subpages/EleitorEditScreen';
 import { EleitorFormScreen } from './screens/subpages/EleitorFormScreen';
 import { NotificacoesScreen } from './screens/subpages/NotificacoesScreen';
+import { TarefasEditScreen } from './screens/subpages/TarefasEditScreen';
 import { TarefasFormScreen } from './screens/subpages/TarefasFormScreen';
 // ConfigPages
 import { auth } from './ApiConfig';
@@ -205,8 +207,10 @@ export default function App() {
         <Stack.Screen name="Assessor" component={DashboardTabs} initialParams={{ role: 'ASSESSOR' }} />
         <Stack.Screen name="Eleitor" component={DashboardTabs} initialParams={{ role: 'ELEITOR' }} />
         <Stack.Screen name="EleitorForm" component={EleitorFormScreen} />
+        <Stack.Screen name="EleitorEdit" component={EleitorEditScreen} />
         <Stack.Screen name="AssessorForm" component={AssessorFormScreen} />
         <Stack.Screen name="TarefasForm" component={TarefasFormScreen} />
+        <Stack.Screen name="TarefasEdit" component={TarefasEditScreen} />
         <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Security" component={SecurityScreen} />

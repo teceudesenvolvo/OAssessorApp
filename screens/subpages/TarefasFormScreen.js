@@ -2,6 +2,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { ArrowLeft, Calendar, Save } from 'lucide-react-native';
 import { useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -11,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { API_BASE_URL, auth } from '../../ApiConfig';
 
 export const TarefasFormScreen = ({ navigation }) => {
     const [titulo, setTitulo] = useState('');
@@ -19,6 +22,7 @@ export const TarefasFormScreen = ({ navigation }) => {
     const [mode, setMode] = useState('date');
     const [tipo, setTipo] = useState('meeting'); // meeting, visit, content, event
     const [descricao, setDescricao] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const taskTypes = [
         { id: 'meeting', label: 'Reunião' },
@@ -38,9 +42,56 @@ export const TarefasFormScreen = ({ navigation }) => {
         setMode(currentMode);
     };
 
-    const handleSave = () => {
-        // Lógica de salvamento aqui
-        navigation.goBack();
+    const handleSave = async () => {
+        if (!titulo) {
+            Alert.alert('Atenção', 'Por favor, preencha o título da tarefa.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const user = auth.currentUser;
+            if (!user) {
+                Alert.alert('Erro', 'Usuário não autenticado.');
+                return;
+            }
+
+            // Buscar dados do usuário para verificar se é assessor e pegar o adminId
+            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+            const userData = await responseUser.json();
+
+            let adminId = user.uid; // Se for político, ele é o admin
+            if (userData && userData.tipoUser === 'assessor') {
+                adminId = userData.adminId || userData.creatorId;
+            }
+
+            const payload = {
+                titulo,
+                data: date.toLocaleDateString('pt-BR'),
+                time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                fullDate: date.toISOString(),
+                tipo,
+                descricao,
+                status: 'pending',
+                creatorId: user.uid,
+                adminId: adminId,
+                createdAt: new Date().toISOString()
+            };
+
+            await fetch(`${API_BASE_URL}/tarefas.json`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            Alert.alert('Sucesso', 'Tarefa agendada com sucesso!');
+            navigation.goBack();
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Erro', 'Não foi possível salvar a tarefa.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -53,7 +104,7 @@ export const TarefasFormScreen = ({ navigation }) => {
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Nova</Text>
-                                <Text style={styles.textWhite}> Tarefa</Text>
+                                <Text style={styles.textWhite}> Atividade</Text>
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -168,9 +219,15 @@ export const TarefasFormScreen = ({ navigation }) => {
                             onChangeText={setDescricao}
                         />
 
-                        <TouchableOpacity style={styles.button} onPress={handleSave}>
-                            <Save size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text style={styles.buttonText}>Agendar Tarefa</Text>
+                        <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <>
+                                    <Save size={20} color="white" style={{ marginRight: 8 }} />
+                                    <Text style={styles.buttonText}>Agendar Tarefa</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </ScrollView>

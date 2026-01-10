@@ -1,20 +1,80 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { Calendar, CheckCircle, Circle, Clock, Plus } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_BASE_URL, auth } from '../ApiConfig';
 
 export const TarefasScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('pending'); // 'pending' | 'done'
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Reunião com Lideranças', time: '14:00', date: 'Hoje', status: 'pending', type: 'meeting' },
-    { id: '2', title: 'Visita ao Bairro Centro', time: '16:30', date: 'Hoje', status: 'pending', type: 'visit' },
-    { id: '3', title: 'Alinhamento Marketing', time: '09:00', date: 'Ontem', status: 'done', type: 'meeting' },
-    { id: '4', title: 'Gravação de Conteúdo', time: '10:00', date: 'Amanhã', status: 'pending', type: 'content' },
-    { id: '5', title: 'Jantar Beneficente', time: '20:00', date: 'Amanhã', status: 'pending', type: 'event' },
-  ]);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const user = auth.currentUser;
+      if (!user) return;
 
-  const toggleTask = (id) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, status: t.status === 'pending' ? 'done' : 'pending' } : t));
+      // 1. Buscar dados do usuário para saber o tipo (Assessor ou Político)
+      const userResp = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+      const userData = await userResp.json();
+      const isAssessor = userData?.tipoUser === 'assessor';
+
+      // 2. Buscar todas as tarefas
+      const tasksResp = await fetch(`${API_BASE_URL}/tarefas.json`);
+      const tasksData = await tasksResp.json();
+
+      if (tasksData) {
+        const loadedTasks = Object.keys(tasksData).map(key => ({
+          id: key,
+          ...tasksData[key]
+        })).filter(task => {
+          if (isAssessor) {
+            // Assessor vê apenas o que criou (ou poderia ver o que foi atribuído a ele)
+            return task.creatorId === user.uid;
+          } else {
+            // Político (Admin) vê tudo que está vinculado ao seu ID de admin
+            return task.adminId === user.uid;
+          }
+        });
+        // Ordenar por data (opcional, aqui invertendo para mostrar mais recentes primeiro se o ID for cronológico)
+        setTasks(loadedTasks.reverse());
+      } else {
+        setTasks([]);
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro', 'Não foi possível carregar as tarefas.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(useCallback(() => {
+    fetchData();
+  }, []));
+
+  const toggleTask = async (id) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    const newStatus = task.status === 'pending' ? 'done' : 'pending';
+    
+    // Atualização Otimista (atualiza a UI antes da resposta)
+    setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+
+    try {
+      await fetch(`${API_BASE_URL}/tarefas/${id}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro', 'Não foi possível atualizar a tarefa.');
+      // Reverte em caso de erro
+      setTasks(tasks.map(t => t.id === id ? { ...t, status: task.status } : t));
+    }
   };
 
   const filteredTasks = tasks.filter(t => t.status === filter);
@@ -38,7 +98,7 @@ export const TarefasScreen = ({ navigation }) => {
             <Text style={styles.headerSubtitle}>Organização</Text>
             <Text style={styles.headerTitle}>
               <Text style={styles.textGreen}>Minhas </Text>
-              <Text style={styles.textWhite}>Tarefas</Text>
+              <Text style={styles.textWhite}>Atividades</Text>
             </Text>
           </View>
           <View style={styles.iconBox}>
@@ -70,34 +130,38 @@ export const TarefasScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.taskList}>
-            {filteredTasks.length === 0 && (
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>Nenhuma tarefa encontrada.</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 40 }} />
+          ) : filteredTasks.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Nenhuma tarefa encontrada.</Text>
+            </View>
+          ) : (
+            filteredTasks.map((item) => (
+              <TouchableOpacity key={item.id} style={styles.taskCard} onPress={() => navigation.navigate('TarefasEdit', { task: item })}>
+                <TouchableOpacity style={styles.taskIcon} onPress={() => toggleTask(item.id)}>
+                  {item.status === 'done' ? (
+                    <CheckCircle size={24} color="#10b981" />
+                  ) : (
+                    <Circle size={24} color="#cbd5e1" />
+                  )}
+                </TouchableOpacity>
+                <View style={styles.taskInfo}>
+                  <Text style={[styles.taskTitle, item.status === 'done' && styles.taskTitleDone]}>{item.titulo}</Text>
+                  <View style={styles.metaRow}>
+                      <Clock size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                      {/* Usando item.data e item.tipo conforme salvo no formulário */}
+                      <Text style={styles.taskMeta}>{item.data} • {item.time}</Text>
+                  </View>
                 </View>
-            )}
-          {filteredTasks.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.taskCard} onPress={() => toggleTask(item.id)}>
-              <View style={styles.taskIcon}>
-                {item.status === 'done' ? (
-                  <CheckCircle size={24} color="#10b981" />
-                ) : (
-                  <Circle size={24} color="#cbd5e1" />
-                )}
-              </View>
-              <View style={styles.taskInfo}>
-                <Text style={[styles.taskTitle, item.status === 'done' && styles.taskTitleDone]}>{item.title}</Text>
-                <View style={styles.metaRow}>
-                    <Clock size={14} color="#94a3b8" style={{ marginRight: 4 }} />
-                    <Text style={styles.taskMeta}>{item.date} • {item.time}</Text>
+                <View style={[styles.typeTag, { backgroundColor: item.tipo === 'meeting' ? '#dbeafe' : '#f1f5f9' }]}>
+                    <Text style={[styles.typeText, { color: item.tipo === 'meeting' ? '#2563eb' : '#64748b' }]}>
+                        {getTypeLabel(item.tipo)}
+                    </Text>
                 </View>
-              </View>
-              <View style={[styles.typeTag, { backgroundColor: item.type === 'meeting' ? '#dbeafe' : '#f1f5f9' }]}>
-                  <Text style={[styles.typeText, { color: item.type === 'meeting' ? '#2563eb' : '#64748b' }]}>
-                      {getTypeLabel(item.type)}
-                  </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            ))
+          )}
         </View>
       </ScrollView>
 

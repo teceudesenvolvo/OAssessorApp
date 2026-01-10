@@ -1,24 +1,102 @@
 // Tela de Político
-import { AlertTriangle, BarChart3, Bell, ChevronRight, Gift, Plus, Users } from 'lucide-react-native';
-import React, { useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { Bell, Calendar, ChevronRight, Gift, Plus, Users } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_BASE_URL, auth } from '../ApiConfig';
 
 export const PoliticoScreen = ({ navigation }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { width, height } = Dimensions.get('window');
 
-  const assessores = [
-    { id: '1', nome: 'Roberto Almeida', cargo: 'Coord. Geral', qtdCadastros: 34 },
-    { id: '2', nome: 'Ana Paula Souza', cargo: 'Comunicação', qtdCadastros: 120 },
-    { id: '3', nome: 'Carlos Mendes', cargo: 'Líder Comunitário', qtdCadastros: 80 },
-  ];
+  const [totalEleitores, setTotalEleitores] = useState(0);
+  const [assessoresList, setAssessoresList] = useState([]);
+  const [aniversariantesList, setAniversariantesList] = useState([]);
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
 
-  const aniversariantes = [
-    { id: '1', nome: 'Julia Silva', cargo: 'Eleitora', idade: 28 },
-    { id: '2', nome: 'Marcos Oliveira', cargo: 'Cabo Eleitoral', idade: 45 },
-    { id: '3', nome: 'Fernanda Costa', cargo: 'Voluntária', idade: 22 },
-  ];
+  const calculateAge = (birthDateString) => {
+    if (!birthDateString) return 0;
+    const parts = birthDateString.split('/');
+    if (parts.length !== 3) return 0;
+    const birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+  };
 
+  const fetchData = async () => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        // 1. Buscar Eleitores
+        const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json`);
+        const dataEleitores = await responseEleitores.json();
+        let myEleitores = [];
+        
+        if (dataEleitores) {
+            myEleitores = Object.keys(dataEleitores)
+                .map(key => ({ id: key, ...dataEleitores[key] }))
+                .filter(item => item.creatorId === user.uid);
+        }
+        setTotalEleitores(myEleitores.length);
+
+        // 2. Filtrar Aniversariantes
+        const today = new Date();
+        const currentDay = today.getDate();
+        const currentMonth = today.getMonth() + 1;
+
+        const birthdays = myEleitores.filter(e => {
+            if (!e.nascimento) return false;
+            const parts = e.nascimento.split('/');
+            if (parts.length !== 3) return false;
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            return day === currentDay && month === currentMonth;
+        }).map(e => ({
+            id: e.id,
+            nome: e.nome,
+            cargo: 'Eleitor',
+            idade: calculateAge(e.nascimento)
+        }));
+        setAniversariantesList(birthdays);
+
+        // 3. Buscar Assessores
+        const responseAssessores = await fetch(`${API_BASE_URL}/assessores.json`);
+        const dataAssessores = await responseAssessores.json();
+        let myAssessores = [];
+
+        if (dataAssessores) {
+            myAssessores = Object.keys(dataAssessores)
+                .map(key => ({ id: key, ...dataAssessores[key] }))
+                .filter(item => item.creatorId === user.uid);
+        }
+        setAssessoresList(myAssessores);
+
+        // 4. Buscar Tarefas (Atividades Pendentes)
+        const responseTarefas = await fetch(`${API_BASE_URL}/tarefas.json`);
+        const dataTarefas = await responseTarefas.json();
+        let countTarefas = 0;
+        if (dataTarefas) {
+            countTarefas = Object.values(dataTarefas).filter(
+                item => item.creatorId === user.uid && item.status === 'pending'
+            ).length;
+        }
+        setPendingTasksCount(countTarefas);
+
+    } catch (error) {
+        console.error("Erro ao carregar dashboard:", error);
+    }
+  };
+
+  useFocusEffect(useCallback(() => {
+    fetchData();
+  }, []));
+  
   useEffect(() => {
     // Calcula a escala inicial para cobrir a tela (diagonal total)
     const maxRadius = Math.hypot(width, height);
@@ -54,7 +132,7 @@ export const PoliticoScreen = ({ navigation }) => {
         <View style={styles.mainCard}>
           <View>
             <Text style={styles.cardLabel}>Total de Eleitores</Text>
-            <Text style={styles.cardValue}>12.450</Text>
+            <Text style={styles.cardValue}>{totalEleitores}</Text>
             <Text style={styles.cardTrend}>
               +12.5% este mês
             </Text>
@@ -68,20 +146,20 @@ export const PoliticoScreen = ({ navigation }) => {
         </View>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <BarChart3 color="#10b981" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Engajamento</Text>
-            <Text style={styles.statValue}>78.4%</Text>
+            <Calendar color="#f59e0b" size={28} style={{ marginBottom: 8 }} />
+            <Text style={styles.statLabel}>Atividades Pendentes</Text>
+            <Text style={styles.statValue}>{pendingTasksCount}</Text>
           </View>
           <View style={styles.statCard}>
-            <AlertTriangle color="#f43f5e" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Ocorrências</Text>
-            <Text style={styles.statValue}>23</Text>
+            <Users color="#3b82f6" size={28} style={{ marginBottom: 8 }} />
+            <Text style={styles.statLabel}>Minha Equipe</Text>
+            <Text style={styles.statValue}>{assessoresList.length}</Text>
           </View>
         </View>
 
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
+      <View style={{ flex: 1, marginTop: 20}} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Content */}
         <View style={styles.contentContainer}>
 
@@ -101,17 +179,21 @@ export const PoliticoScreen = ({ navigation }) => {
               style={{ marginHorizontal: -24 }}
               contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 10 }}
             >
-              {assessores.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.assessorCard}>
-                  <View style={styles.avatarContainer}><Text style={styles.avatarText}>{item.nome.charAt(0)}</Text></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.assessorName}>{item.nome}</Text>
-                    <Text style={styles.assessorRole}>{item.cargo}</Text>
-                    <Text style={styles.assessorRole}>{item.qtdCadastros} Eleitores</Text>
-                  </View>
-                  <ChevronRight size={20} color="#cbd5e1" />
-                </TouchableOpacity>
-              ))}
+              {assessoresList.length === 0 ? (
+                <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum assessor cadastrado.</Text>
+              ) : (
+                assessoresList.map((item) => (
+                  <TouchableOpacity key={item.id} style={styles.assessorCard}>
+                    <View style={styles.avatarContainer}><Text style={styles.avatarText}>{item.nome.charAt(0)}</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.assessorName}>{item.nome}</Text>
+                      <Text style={styles.assessorRole}>{item.cargo}</Text>
+                      <Text style={styles.assessorRole}>{item.qtdCadastros || 0} Eleitores</Text>
+                    </View>
+                    <ChevronRight size={20} color="#cbd5e1" />
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
           </View>
 
@@ -126,23 +208,27 @@ export const PoliticoScreen = ({ navigation }) => {
               style={{ marginHorizontal: -24 }}
               contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 10 }}
             >
-              {aniversariantes.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.assessorCard}>
-                  <View style={[styles.avatarContainer, { backgroundColor: '#dbeafe' }]}>
-                    <Text style={[styles.avatarText, { color: '#2563eb' }]}>{item.nome.charAt(0)}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.assessorName}>{item.nome}</Text>
-                    <Text style={styles.assessorRole}>{item.cargo}</Text>
-                    <Text style={styles.assessorRole}>Completa {item.idade} anos</Text>
-                  </View>
-                  <Gift size={20} color="#cbd5e1" />
-                </TouchableOpacity>
-              ))}
+              {aniversariantesList.length === 0 ? (
+                <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum aniversariante hoje.</Text>
+              ) : (
+                aniversariantesList.map((item) => (
+                  <TouchableOpacity key={item.id} style={styles.assessorCard}>
+                    <View style={[styles.avatarContainer, { backgroundColor: '#dbeafe' }]}>
+                      <Text style={[styles.avatarText, { color: '#2563eb' }]}>{item.nome.charAt(0)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.assessorName}>{item.nome}</Text>
+                      <Text style={styles.assessorRole}>{item.cargo}</Text>
+                      <Text style={styles.assessorRole}>Completa {item.idade} anos</Text>
+                    </View>
+                    <Gift size={20} color="#cbd5e1" />
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
-      </ScrollView>
+      </View>
 
       {/* Círculo de Transição (Reveal) */}
       <Animated.View
@@ -219,9 +305,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     position: 'absolute',
-    bottom: -29,
+    bottom: -40,
     left: 24,
     right: 24,
+    zIndex: 1,
   },
   logoText: {
     fontSize: 32,
