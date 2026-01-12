@@ -6,7 +6,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyBNW0mDARNEofVO6iJXwYz-IAXKy9BxJ3Y",
     authDomain: "oassessor-blu-default-rtdb.firebaseapp.com",
     databaseURL: "https://oassessor-blu-default-rtdb.firebaseio.com",
-    projectId: "oassessor-blu-default-rtdb",
+    projectId: "oassessor-blu",
     storageBucket: "oassessor-blu-default-rtdb.appspot.com",
     messagingSenderId: "951583753744",
     appId: "1:951583753744:web:ad9766f2b6c40da901ac95",
@@ -26,3 +26,5 @@ try {
 
 export { auth };
 export const API_BASE_URL = firebaseConfig.databaseURL;
+export const CLOUD_FUNCTION_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/sendInviteEmail`;
+export const GENERATE_TOKEN_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/generateWebAuthToken`;

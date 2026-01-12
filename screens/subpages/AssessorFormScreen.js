@@ -4,6 +4,7 @@ import {
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -12,7 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth } from '../../ApiConfig';
+import { API_BASE_URL, auth, CLOUD_FUNCTION_URL } from '../../ApiConfig';
 
 // Funções de Máscara (reutilizando lógica simples)
 const maskCPF = (value) => {
@@ -39,6 +40,44 @@ export const AssessorFormScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [telefone, setTelefone] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const sendInviteEmail = async (name, emailAddress) => {
+        try {
+            const response = await fetch(CLOUD_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: emailAddress,
+                    nome: name
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Falha no envio (${response.status}): ${errorText}`);
+            }
+
+            Alert.alert('Enviado', 'O convite foi enviado por email com sucesso.');
+        } catch (error) {
+            console.log('Erro ao enviar email via Cloud Function:', error);
+            Alert.alert(
+                'Erro no Envio',
+                `Houve uma falha ao tentar enviar o email automaticamente.\n\nErro: ${error.message}\n\nDeseja abrir o app de email manualmente?`,
+                [
+                    { text: 'Não', style: 'cancel' },
+                    { 
+                        text: 'Sim', 
+                        onPress: () => {
+                            const subject = "Convite para O Assessor";
+                            const body = `Olá ${name},\n\nVocê foi convidado para fazer parte da equipe no aplicativo O Assessor.\n\nPara concluir seu cadastro, clique no link abaixo:\n\nhttps://oassessor-app.com/cadastro?email=${emailAddress}\n\nAtenciosamente,\nEquipe O Assessor`;
+                            const url = `mailto:${emailAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                            Linking.openURL(url).catch(() => Alert.alert('Erro', 'Não foi possível abrir o aplicativo de email.'));
+                        }
+                    }
+                ]
+            );
+        }
+    };
 
     const handleSave = async () => {
         if (!nome || !email) {
@@ -84,8 +123,17 @@ export const AssessorFormScreen = ({ navigation }) => {
                 body: JSON.stringify(assessorData)
             });
 
-            Alert.alert('Sucesso', 'Assessor cadastrado com sucesso!');
-            navigation.goBack();
+            Alert.alert(
+                'Sucesso',
+                'Assessor cadastrado com sucesso! Deseja enviar o convite por email?',
+                [
+                    { text: 'Agora não', onPress: () => navigation.goBack(), style: 'cancel' },
+                    { text: 'Enviar Convite', onPress: async () => {
+                        await sendInviteEmail(nome, email);
+                        navigation.goBack();
+                    }}
+                ]
+            );
         } catch (error) {
             Alert.alert('Erro', 'Não foi possível cadastrar o assessor. Verifique sua conexão.');
             console.error(error);

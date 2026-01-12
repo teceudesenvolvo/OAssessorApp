@@ -61,7 +61,8 @@ export const PoliticoScreen = ({ navigation }) => {
             id: e.id,
             nome: e.nome,
             cargo: 'Eleitor',
-            idade: calculateAge(e.nascimento)
+            idade: calculateAge(e.nascimento),
+            telefone: e.telefone
         }));
         setAniversariantesList(birthdays);
 
@@ -153,7 +154,7 @@ export const PoliticoScreen = ({ navigation }) => {
           <View style={styles.statCard}>
             <Users color="#3b82f6" size={28} style={{ marginBottom: 8 }} />
             <Text style={styles.statLabel}>Minha Equipe</Text>
-            <Text style={styles.statValue}>{assessoresList.length}</Text>
+            <Text style={styles.statValue}>{assessoresList.length} de 10</Text>
           </View>
         </View>
 
@@ -183,7 +184,7 @@ export const PoliticoScreen = ({ navigation }) => {
                 <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum assessor cadastrado.</Text>
               ) : (
                 assessoresList.map((item) => (
-                  <TouchableOpacity key={item.id} style={styles.assessorCard}>
+                  <TouchableOpacity key={item.id} style={styles.assessorCard} onPress={() => navigation.navigate('AssessorEdit', { assessor: item })}>
                     <View style={styles.avatarContainer}><Text style={styles.avatarText}>{item.nome.charAt(0)}</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.assessorName}>{item.nome}</Text>
@@ -212,7 +213,7 @@ export const PoliticoScreen = ({ navigation }) => {
                 <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum aniversariante hoje.</Text>
               ) : (
                 aniversariantesList.map((item) => (
-                  <TouchableOpacity key={item.id} style={styles.assessorCard}>
+                  <TouchableOpacity key={item.id} style={styles.assessorCard} onPress={() => navigation.navigate('Aniversariante', { person: item })}>
                     <View style={[styles.avatarContainer, { backgroundColor: '#dbeafe' }]}>
                       <Text style={[styles.avatarText, { color: '#2563eb' }]}>{item.nome.charAt(0)}</Text>
                     </View>

@@ -1,24 +1,104 @@
-import { ArrowLeft, Save, User } from 'lucide-react-native';
-import { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import * as WebBrowser from 'expo-web-browser';
+import { ArrowLeft, Save, Settings, User } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import { API_BASE_URL, auth, GENERATE_TOKEN_URL } from '../../ApiConfig';
 
 export const EditProfileScreen = ({ navigation }) => {
-    const [name, setName] = useState('Candidato Exemplo');
-    const [email, setEmail] = useState('candidato@exemplo.com');
-    const [phone, setPhone] = useState('(47) 99999-9999');
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
     const [bio, setBio] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(true);
 
-    const handleSave = () => {
-        navigation.goBack();
+    const fetchData = async () => {
+        const user = auth.currentUser;
+        if (!user) {
+            Alert.alert('Erro', 'Usuário não autenticado.');
+            setInitialLoading(false);
+            navigation.goBack();
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+            const data = await response.json();
+
+            if (data) {
+                setName(data.nome || '');
+                setEmail(data.email || user.email);
+                setPhone(data.telefone || '');
+                setBio(data.bio || '');
+            }
+        } catch (error) {
+            console.error('Erro ao buscar dados do perfil:', error);
+            Alert.alert('Erro', 'Não foi possível carregar seus dados.');
+        } finally {
+            setInitialLoading(false);
+        }
+    };
+
+    useFocusEffect(useCallback(() => { fetchData(); }, []));
+
+    const handleSave = async () => {
+        if (!name.trim()) {
+            Alert.alert('Atenção', 'O nome não pode ficar em branco.');
+            return;
+        }
+        setLoading(true);
+        try {
+            const payload = { nome: name, telefone: phone, bio, updatedAt: new Date().toISOString() };
+            await fetch(`${API_BASE_URL}/users/${auth.currentUser.uid}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            Alert.alert('Sucesso', 'Seus dados foram atualizados!');
+            navigation.goBack();
+        } catch (error) {
+            Alert.alert('Erro', 'Não foi possível salvar as alterações.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOpenAdvancedSettings = async () => {
+        setLoading(true);
+        try {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            // 1. Obtém o ID Token do usuário logado
+            const idToken = await user.getIdToken();
+
+            // 2. Solicita um Custom Token para a Cloud Function
+            const response = await fetch(GENERATE_TOKEN_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken })
+            });
+
+            if (!response.ok) throw new Error('Falha ao gerar autenticação');
+
+            const { token } = await response.json();
+
+            // 3. Abre a URL passando o token e o email
+            await WebBrowser.openBrowserAsync(`https://oassessor.vercel.app/dashboard?token=${token}&email=${user.email}`);
+        } catch (error) {
+            Alert.alert('Erro', 'Não foi possível acessar o painel web.');
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -39,6 +119,12 @@ export const EditProfileScreen = ({ navigation }) => {
                     </View>
                 </View>
             </View>
+
+            {initialLoading ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#6EE794" />
+                </View>
+            ) : (
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -62,11 +148,11 @@ export const EditProfileScreen = ({ navigation }) => {
 
                         <Text style={styles.label}>Email</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
                             value={email}
-                            onChangeText={setEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            editable={false}
                             placeholderTextColor="#64748b"
                         />
 
@@ -90,13 +176,25 @@ export const EditProfileScreen = ({ navigation }) => {
                             placeholderTextColor="#64748b"
                         />
 
-                        <TouchableOpacity style={styles.button} onPress={handleSave}>
-                            <Save size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text style={styles.buttonText}>Salvar Alterações</Text>
+                        <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <>
+                                    <Save size={20} color="white" style={{ marginRight: 8 }} />
+                                    <Text style={styles.buttonText}>Salvar Alterações</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.button, { backgroundColor: '#334155', marginTop: 16 }]} onPress={handleOpenAdvancedSettings}>
+                            <Settings size={20} color="white" style={{ marginRight: 8 }} />
+                            <Text style={styles.buttonText}>Configurações Avançadas</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+            )}
         </View>
     );
 };

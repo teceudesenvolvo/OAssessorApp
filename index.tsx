@@ -22,6 +22,8 @@ import { PerfilScreen } from './screens/PerfilScreen';
 import { PoliticoScreen } from './screens/PoliticoScreen';
 import { TarefasScreen } from './screens/TarefasScreen';
 // SubPages
+import { AniversarianteScreen } from './screens/subpages/AniversarianteScreen';
+import { AssessorEditScreen } from './screens/subpages/AssessorEditScreen';
 import { AssessorFormScreen } from './screens/subpages/AssessorFormScreen';
 import { EleitorEditScreen } from './screens/subpages/EleitorEditScreen';
 import { EleitorFormScreen } from './screens/subpages/EleitorFormScreen';
@@ -209,6 +211,8 @@ export default function App() {
         <Stack.Screen name="EleitorForm" component={EleitorFormScreen} />
         <Stack.Screen name="EleitorEdit" component={EleitorEditScreen} />
         <Stack.Screen name="AssessorForm" component={AssessorFormScreen} />
+        <Stack.Screen name="AssessorEdit" component={AssessorEditScreen} />
+        <Stack.Screen name="Aniversariante" component={AniversarianteScreen} />
         <Stack.Screen name="TarefasForm" component={TarefasFormScreen} />
         <Stack.Screen name="TarefasEdit" component={TarefasEditScreen} />
         <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
