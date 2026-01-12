@@ -1,21 +1,74 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Bell, Check, Clock, MessageSquare } from 'lucide-react-native';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_BASE_URL, auth } from '../../ApiConfig';
 
 export const NotificacoesScreen = ({ navigation }) => {
-  const [notifications, setNotifications] = useState([
-    { id: '1', title: 'Nova tarefa atribuída', description: 'Você tem uma nova reunião agendada para amanhã.', time: 'Há 2 horas', read: false, type: 'task' },
-    { id: '2', title: 'Meta atingida!', description: 'Parabéns! A meta de cadastros da semana foi alcançada.', time: 'Há 5 horas', read: false, type: 'success' },
-    { id: '3', title: 'Lembrete de Aniversário', description: 'Hoje é aniversário do eleitor Marcos Oliveira.', time: 'Há 1 dia', read: true, type: 'birthday' },
-    { id: '4', title: 'Atualização do Sistema', description: 'O aplicativo passará por manutenção no domingo.', time: 'Há 2 dias', read: true, type: 'system' },
-  ]);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+  const fetchNotifications = async () => {
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const response = await fetch(`${API_BASE_URL}/notificacoes.json`);
+      const data = await response.json();
+
+      if (data) {
+        const userEmail = user.email;
+        const loadedNotifications = Object.keys(data)
+          .map(key => ({ id: key, ...data[key] }))
+          .filter(n => {
+            // Filtra se userEmail não for vazio e for igual ao do usuário logado
+            // OU se userEmail for vazio (global)
+            const isPersonal = n.userEmail && n.userEmail !== "" && n.userEmail === userEmail;
+            const isGlobal = !n.userEmail || n.userEmail === "";
+            return isPersonal || isGlobal;
+          })
+          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)); // Ordena por data (mais recente primeiro)
+
+        setNotifications(loadedNotifications);
+      } else {
+        setNotifications([]);
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro', 'Não foi possível carregar as notificações.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  useFocusEffect(useCallback(() => {
+    fetchNotifications();
+  }, []));
+
+  const markAsRead = async (id) => {
+    // Atualização otimista
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+
+    try {
+      await fetch(`${API_BASE_URL}/notificacoes/${id}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ read: true })
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    // Atualização otimista
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+    // Atualiza todas no backend (uma por uma, pois o Firebase RTDB REST API não suporta batch update simples em paths diferentes sem estruturar um objeto grande)
+    notifications.forEach(n => {
+      if (!n.read) markAsRead(n.id);
+    });
   };
 
   const getIcon = (type) => {
@@ -57,27 +110,31 @@ export const NotificacoesScreen = ({ navigation }) => {
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {notifications.map((item) => (
-            <TouchableOpacity 
-                key={item.id} 
-                style={[styles.notificationCard, !item.read && styles.unreadCard]}
-                onPress={() => markAsRead(item.id)}
-            >
-                <View style={[styles.iconContainer, !item.read && styles.unreadIconContainer]}>
-                    {getIcon(item.type)}
-                </View>
-                <View style={styles.textContainer}>
-                    <View style={styles.titleRow}>
-                        <Text style={[styles.title, !item.read && styles.unreadTitle]}>{item.title}</Text>
-                        {!item.read && <View style={styles.dot} />}
-                    </View>
-                    <Text style={styles.description}>{item.description}</Text>
-                    <Text style={styles.time}>{item.time}</Text>
-                </View>
-            </TouchableOpacity>
-        ))}
+        {loading ? (
+          <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 40 }} />
+        ) : (
+          notifications.map((item) => (
+              <TouchableOpacity 
+                  key={item.id} 
+                  style={[styles.notificationCard, !item.read && styles.unreadCard]}
+                  onPress={() => markAsRead(item.id)}
+              >
+                  <View style={[styles.iconContainer, !item.read && styles.unreadIconContainer]}>
+                      {getIcon(item.type)}
+                  </View>
+                  <View style={styles.textContainer}>
+                      <View style={styles.titleRow}>
+                          <Text style={[styles.title, !item.read && styles.unreadTitle]}>{item.title}</Text>
+                          {!item.read && <View style={styles.dot} />}
+                      </View>
+                      <Text style={styles.description}>{item.description}</Text>
+                      <Text style={styles.time}>{item.time || 'Agora'}</Text>
+                  </View>
+              </TouchableOpacity>
+          ))
+        )}
         
-        {notifications.length === 0 && (
+        {!loading && notifications.length === 0 && (
             <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>Nenhuma notificação no momento.</Text>
             </View>

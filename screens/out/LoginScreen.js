@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { auth } from '../../ApiConfig';
+import { API_BASE_URL, auth } from '../../ApiConfig';
 
 export const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -40,9 +40,23 @@ export const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Buscar dados do usuário para verificar o tipo
+      const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+      const userData = await response.json();
+
+      // Lógica de Redirecionamento:
+      // Se tipoUser for 'assessor' -> vai para AssessorScreen (rota 'Assessor')
+      // Caso contrário (ex: politico) -> vai para PoliticoScreen (rota 'Painel')
+      let targetRoute = 'Painel'; 
+      if (userData && userData.tipoUser === 'assessor') {
+        targetRoute = 'Assessor';
+      }
+
       // Se o login for bem-sucedido, inicia a animação
-      startAnimationAndNavigate();
+      startAnimationAndNavigate(targetRoute);
     } catch (error) {
       console.error(error);
       let msg = 'Ocorreu um erro ao fazer login.';
@@ -74,7 +88,7 @@ export const LoginScreen = ({ navigation }) => {
     }
   };
 
-  const startAnimationAndNavigate = () => {
+  const startAnimationAndNavigate = (targetRoute) => {
     if (buttonRef.current) {
       buttonRef.current.measure((fx, fy, w, h, px, py) => {
         // Calcula o centro do botão
@@ -101,7 +115,7 @@ export const LoginScreen = ({ navigation }) => {
           duration: 400,
           useNativeDriver: true,
         }).start(() => {
-          navigation.replace('Painel');
+          navigation.replace(targetRoute);
           setLoading(false);
         });
       });

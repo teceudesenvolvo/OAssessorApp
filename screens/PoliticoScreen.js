@@ -13,6 +13,7 @@ export const PoliticoScreen = ({ navigation }) => {
   const [assessoresList, setAssessoresList] = useState([]);
   const [aniversariantesList, setAniversariantesList] = useState([]);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const calculateAge = (birthDateString) => {
     if (!birthDateString) return 0;
@@ -89,6 +90,20 @@ export const PoliticoScreen = ({ navigation }) => {
         }
         setPendingTasksCount(countTarefas);
 
+        // 5. Buscar Notificações (Contar não lidas)
+        const responseNotificacoes = await fetch(`${API_BASE_URL}/notificacoes.json`);
+        const dataNotificacoes = await responseNotificacoes.json();
+        let countNotificacoes = 0;
+        if (dataNotificacoes) {
+            const userEmail = user.email;
+            countNotificacoes = Object.values(dataNotificacoes).filter(n => {
+                const isPersonal = n.userEmail && n.userEmail !== "" && n.userEmail === userEmail;
+                const isGlobal = !n.userEmail || n.userEmail === "";
+                return (isPersonal || isGlobal) && !n.read;
+            }).length;
+        }
+        setUnreadNotificationsCount(countNotificacoes);
+
     } catch (error) {
         console.error("Erro ao carregar dashboard:", error);
     }
@@ -126,6 +141,11 @@ export const PoliticoScreen = ({ navigation }) => {
           </View>
           <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
             <Bell size={24} color="white" />
+            {unreadNotificationsCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadNotificationsCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -284,6 +304,25 @@ const styles = StyleSheet.create({
   welcomeText: { color: '#bfdbfe', fontSize: 14, fontWeight: '500' },
   dashboardTitle: { color: 'white', fontSize: 30, fontWeight: '800' },
   bellButton: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 9999 },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#101422',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   mainCard: {
     backgroundColor: 'white',
     padding: 24,

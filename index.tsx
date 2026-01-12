@@ -3,7 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { registerRootComponent } from 'expo';
 import { BlurView } from 'expo-blur';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Calendar, Home, Map as MapIcon, PlusCircle, User, Workflow } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -31,7 +34,7 @@ import { NotificacoesScreen } from './screens/subpages/NotificacoesScreen';
 import { TarefasEditScreen } from './screens/subpages/TarefasEditScreen';
 import { TarefasFormScreen } from './screens/subpages/TarefasFormScreen';
 // ConfigPages
-import { auth } from './ApiConfig';
+import { API_BASE_URL, auth } from './ApiConfig';
 import { EditProfileScreen } from './screens/configPages/EditProfileScreen';
 import { HelpScreen } from './screens/configPages/HelpScreen';
 import { NotificationSettingsScreen } from './screens/configPages/NotificationSettingsScreen';
@@ -40,6 +43,14 @@ import { SecurityScreen } from './screens/configPages/SecurityScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Configuração do Handler de Notificações (Define como elas aparecem com o app aberto)
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // --- Componente de Placeholder para Mapa ---
 const MapPlaceholder = () => (
@@ -184,14 +195,59 @@ function DashboardTabs({ route, navigation }) {
 export default function App() {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState(null);
+  const [initialRoute, setInitialRoute] = useState("Login");
+  const [expoPushToken, setExpoPushToken] = useState('');
+  const notificationListener = React.useRef();
+  const responseListener = React.useRef();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    // Registrar para notificações Push
+    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
+
+    // Listeners para notificações
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      // Notificação recebida com app aberto
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      // Usuário tocou na notificação
+    });
+
+    return () => {
+      if (notificationListener.current) Notifications.removeNotificationSubscription(notificationListener.current);
+      if (responseListener.current) Notifications.removeNotificationSubscription(responseListener.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (u) {
+        // Se tiver token e usuário, salva no Firebase
+        if (expoPushToken) {
+          fetch(`${API_BASE_URL}/users/${u.uid}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pushToken: expoPushToken })
+          }).catch(err => console.log("Erro ao salvar token:", err));
+        }
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/users/${u.uid}.json`);
+          const userData = await response.json();
+          if (userData && userData.tipoUser === 'assessor') {
+            setInitialRoute("Assessor");
+          } else {
+            setInitialRoute("Painel");
+          }
+        } catch (error) {
+          setInitialRoute("Painel");
+        }
+      }
       if (initializing) setInitializing(false);
     });
     return unsubscribe;
-  }, []);
+  }, [expoPushToken]); // Adicionado dependência do token para salvar assim que disponível
 
   if (initializing) {
     return (
@@ -203,7 +259,7 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={user ? "Painel" : "Login"}>
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRoute}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Painel" component={DashboardTabs} initialParams={{ role: 'POLITICO' }} />
         <Stack.Screen name="Assessor" component={DashboardTabs} initialParams={{ role: 'ASSESSOR' }} />
@@ -223,6 +279,44 @@ export default function App() {
       </Stack.Navigator>
     </NavigationContainer>
   );
+}
+
+async function registerForPushNotificationsAsync() {
+  // Verificação para evitar erro no Expo Go (Android SDK 53+)
+  if (Platform.OS === 'android' && Constants.executionEnvironment === 'storeClient') {
+    console.log('Aviso: Notificações Push não são suportadas no Expo Go para Android. Use uma Development Build.');
+    return;
+  }
+
+  let token;
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      // alert('Falha ao obter permissão para notificações push!');
+      return;
+    }
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  } else {
+    // alert('Must use physical device for Push Notifications');
+  }
+
+  return token;
 }
 
 registerRootComponent(App);
