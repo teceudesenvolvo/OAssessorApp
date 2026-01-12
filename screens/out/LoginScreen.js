@@ -1,4 +1,4 @@
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ export const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   
   // Configuração da animação
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -30,8 +31,9 @@ export const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   
   const handleLogin = async () => {
+    setErrorMessage('');
     if (!email || !password) {
-      Alert.alert('Erro', 'Por favor, preencha email e senha.');
+      setErrorMessage('Por favor, preencha email e senha.');
       return;
     }
 
@@ -48,8 +50,27 @@ export const LoginScreen = ({ navigation }) => {
       if (error.code === 'auth/user-not-found') msg = 'Usuário não encontrado.';
       if (error.code === 'auth/wrong-password') msg = 'Senha incorreta.';
       if (error.code === 'auth/invalid-credential') msg = 'Credenciais inválidas.';
-      Alert.alert('Falha no Login', msg);
+      setErrorMessage(msg);
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setErrorMessage('');
+    if (!email) {
+      setErrorMessage('Por favor, digite seu email no campo acima para recuperar a senha.');
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      Alert.alert('Email Enviado', 'Verifique sua caixa de entrada (e spam) para redefinir sua senha.');
+    } catch (error) {
+      console.error(error);
+      let msg = 'Não foi possível enviar o email de recuperação.';
+      if (error.code === 'auth/invalid-email') msg = 'Email inválido.';
+      if (error.code === 'auth/user-not-found') msg = 'Usuário não encontrado.';
+      setErrorMessage(msg);
     }
   };
 
@@ -121,7 +142,10 @@ export const LoginScreen = ({ navigation }) => {
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              setErrorMessage('');
+            }}
           />
 
           <TextInput
@@ -130,8 +154,13 @@ export const LoginScreen = ({ navigation }) => {
             placeholderTextColor="#9ca3af"
             secureTextEntry
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              setErrorMessage('');
+            }}
           />
+
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
           <TouchableOpacity ref={buttonRef} style={styles.button} onPress={handleLogin} disabled={loading}>
             {loading ? (
@@ -141,7 +170,7 @@ export const LoginScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.forgotPasswordContainer}>
+          <TouchableOpacity style={styles.forgotPasswordContainer} onPress={handleForgotPassword}>
             <Text style={styles.forgotPasswordText}>
               Esqueceu a senha? <Text style={styles.recoverText}>Recupere</Text>
             </Text>
@@ -239,6 +268,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
     color: '#333',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   button: {
     height: 55,
