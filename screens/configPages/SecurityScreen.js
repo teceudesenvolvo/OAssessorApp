@@ -1,23 +1,64 @@
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { ArrowLeft, Lock, Shield } from 'lucide-react-native';
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import { auth } from '../../ApiConfig';
 
 export const SecurityScreen = ({ navigation }) => {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSave = () => {
-        navigation.goBack();
+    const reauthenticate = async (currentPassword) => {
+        const user = auth.currentUser;
+        const cred = EmailAuthProvider.credential(user.email, currentPassword);
+        return reauthenticateWithCredential(user, cred);
+    };
+
+    const handleSave = async () => {
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            Alert.alert('Erro', 'A nova senha e a confirmação não coincidem.');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            Alert.alert('Erro', 'A nova senha deve ter pelo menos 6 caracteres.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await reauthenticate(currentPassword);
+            await updatePassword(auth.currentUser, newPassword);
+            Alert.alert('Sucesso', 'Sua senha foi atualizada com sucesso!');
+            navigation.goBack();
+        } catch (error) {
+            console.error(error);
+            let msg = 'Não foi possível atualizar a senha.';
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') msg = 'Senha atual incorreta.';
+            if (error.code === 'auth/weak-password') msg = 'A nova senha é muito fraca.';
+            if (error.code === 'auth/requires-recent-login') msg = 'Por favor, faça login novamente antes de alterar a senha.';
+            Alert.alert('Erro', msg);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -78,9 +119,15 @@ export const SecurityScreen = ({ navigation }) => {
                             placeholderTextColor="#64748b"
                         />
 
-                        <TouchableOpacity style={styles.button} onPress={handleSave}>
-                            <Lock size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text style={styles.buttonText}>Atualizar Senha</Text>
+                        <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <>
+                                    <Lock size={20} color="white" style={{ marginRight: 8 }} />
+                                    <Text style={styles.buttonText}>Atualizar Senha</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </ScrollView>

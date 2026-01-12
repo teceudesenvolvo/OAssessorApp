@@ -1,4 +1,4 @@
-import { Bell, ChevronRight, Edit3, HelpCircle, LogOut, Shield, User } from 'lucide-react-native';
+import { ChevronRight, Edit3, HelpCircle, LogOut, Shield, User } from 'lucide-react-native';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -13,7 +13,6 @@ export const PerfilScreen = ({ navigation }) => {
 
   const menuItems = [
     { id: '1', icon: User, label: 'Meus Dados', description: 'Gerenciar informações pessoais', route: 'EditProfile' },
-    { id: '2', icon: Bell, label: 'Notificações', description: 'Preferências de alertas', route: 'NotificationSettings' },
     { id: '3', icon: Shield, label: 'Segurança', description: 'Senha e autenticação', route: 'Security' },
     { id: '4', icon: HelpCircle, label: 'Ajuda e Suporte', description: 'Fale conosco', route: 'Help' },
   ];

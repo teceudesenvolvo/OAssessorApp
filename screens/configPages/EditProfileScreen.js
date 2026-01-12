@@ -18,9 +18,12 @@ import { API_BASE_URL, auth, GENERATE_TOKEN_URL } from '../../ApiConfig';
 
 export const EditProfileScreen = ({ navigation }) => {
     const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
-    const [bio, setBio] = useState('');
+    const [email, setEmail] = useState('');
+    const [cargo, setCargo] = useState('');
+    const [cpf, setCpf] = useState('');
+    const [createdAt, setCreatedAt] = useState('');
+    const [tipoUser, setTipoUser] = useState('');
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
 
@@ -41,7 +44,10 @@ export const EditProfileScreen = ({ navigation }) => {
                 setName(data.nome || '');
                 setEmail(data.email || user.email);
                 setPhone(data.telefone || '');
-                setBio(data.bio || '');
+                setCargo(data.cargo || '');
+                setCpf(data.cpf || '');
+                setCreatedAt(data.createdAt ? new Date(data.createdAt).toLocaleDateString('pt-BR') : '');
+                setTipoUser(data.tipoUser || '');
             }
         } catch (error) {
             console.error('Erro ao buscar dados do perfil:', error);
@@ -60,7 +66,7 @@ export const EditProfileScreen = ({ navigation }) => {
         }
         setLoading(true);
         try {
-            const payload = { nome: name, telefone: phone, bio, updatedAt: new Date().toISOString() };
+            const payload = { nome: name, telefone: phone, updatedAt: new Date().toISOString() };
             await fetch(`${API_BASE_URL}/users/${auth.currentUser.uid}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             Alert.alert('Sucesso', 'Seus dados foram atualizados!');
             navigation.goBack();
@@ -87,7 +93,10 @@ export const EditProfileScreen = ({ navigation }) => {
                 body: JSON.stringify({ idToken })
             });
 
-            if (!response.ok) throw new Error('Falha ao gerar autenticação');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Falha ao gerar autenticação (${response.status}): ${errorText}`);
+            }
 
             const { token } = await response.json();
 
@@ -145,6 +154,14 @@ export const EditProfileScreen = ({ navigation }) => {
                             onChangeText={setName}
                             placeholderTextColor="#64748b"
                         />
+                         <Text style={styles.label}>Telefone</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={phone}
+                            onChangeText={setPhone}
+                            keyboardType="phone-pad"
+                            placeholderTextColor="#64748b"
+                        />
 
                         <Text style={styles.label}>Email</Text>
                         <TextInput
@@ -156,25 +173,40 @@ export const EditProfileScreen = ({ navigation }) => {
                             placeholderTextColor="#64748b"
                         />
 
-                        <Text style={styles.label}>Telefone</Text>
+                        <Text style={styles.label}>CPF</Text>
                         <TextInput
-                            style={styles.input}
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
+                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            value={cpf}
+                            editable={false}
                             placeholderTextColor="#64748b"
                         />
 
-                        <Text style={styles.label}>Biografia / Sobre</Text>
+                       
+
+                        <Text style={styles.label}>Cargo</Text>
                         <TextInput
-                            style={[styles.input, { height: 100, textAlignVertical: 'top', paddingTop: 12 }]}
-                            value={bio}
-                            onChangeText={setBio}
-                            multiline
-                            numberOfLines={4}
-                            placeholder="Escreva um pouco sobre você..."
+                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            value={cargo}
+                            editable={false}
                             placeholderTextColor="#64748b"
                         />
+
+                        <Text style={styles.label}>Tipo de Usuário</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            value={tipoUser}
+                            editable={false}
+                            placeholderTextColor="#64748b"
+                        />
+
+                        <Text style={styles.label}>Data de Criação</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            value={createdAt}
+                            editable={false}
+                            placeholderTextColor="#64748b"
+                        />
+
 
                         <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
                             {loading ? (
