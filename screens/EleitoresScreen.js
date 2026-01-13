@@ -187,11 +187,15 @@ export const EleitorCadastroScreen = ({ navigation }) => {
             </ScrollView>
 
             <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white' }]} onPress={handleExportPDF}>
-                <FileText size={24} color="#6EE794" />
+                <View pointerEvents="none">
+                    <FileText size={24} color="#6EE794" />
+                </View>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('EleitorForm')}>
-                <Plus size={24} color="white" />
+                <View pointerEvents="none">
+                    <Plus size={24} color="white" />
+                </View>
             </TouchableOpacity>
         </View>
     );
@@ -260,5 +264,5 @@ const styles = StyleSheet.create({
     eleitorText: { color: '#64748b', fontSize: 12 },
     statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
     statusText: { fontSize: 10, fontWeight: 'bold' },
-    fab: { position: 'absolute', bottom: 110, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primaryGreen, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+    fab: { position: 'absolute', bottom: 110, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primaryGreen, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, zIndex: 999 },
 });

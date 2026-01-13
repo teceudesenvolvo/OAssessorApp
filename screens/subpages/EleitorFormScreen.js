@@ -116,6 +116,7 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
         setLoading(true);
         // ID do usuário logado que está criando o eleitor
         const creatorId = auth.currentUser?.uid;
+        const user = auth.currentUser;
 
         try {
             const payload = {
@@ -137,6 +138,11 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
                 creatorId
             };
 
+            // Buscar dados do usuário para obter adminId
+            const responseUser = await fetch(`${API_BASE_URL}/users/${creatorId}.json`);
+            const userData = await responseUser.json();
+            const adminId = userData?.adminId || creatorId;
+
             const response = await fetch(`${API_BASE_URL}/eleitores.json`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -144,6 +150,23 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
             });
 
             if (!response.ok) throw new Error('Falha ao salvar');
+
+            // Criar Notificação de Novo Eleitor
+            await fetch(`${API_BASE_URL}/notificacoes.json`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: 'Novo Eleitor',
+                    description: `O eleitor ${nome} foi cadastrado na base.`,
+                    type: 'success',
+                    read: false,
+                    createdAt: new Date().toISOString(),
+                    userId: creatorId,
+                    creatorId: creatorId,
+                    adminId: adminId,
+                    userEmail: user.email
+                })
+            });
 
             Alert.alert('Sucesso', 'Eleitor cadastrado com sucesso!');
             if (onSave) onSave();

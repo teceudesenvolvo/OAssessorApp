@@ -1,6 +1,9 @@
 const { onRequest } = require("firebase-functions/v2/https");
+const functions = require("firebase-functions/v1");
+// const { onValueCreated } = require("firebase-functions/v2/database");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
+const fetch = require("node-fetch");
 
 admin.initializeApp();
 
@@ -48,6 +51,66 @@ exports.sendInviteEmail = onRequest({ cors: true, invoker: 'public' }, async (re
     } catch (error) {
       console.error("Erro ao enviar email:", error);
       res.status(500).send({ error: error.toString() });
+    }
+});
+
+exports.sendPushOnNotification = functions.database.ref("/notificacoes/{notificationId}").onCreate(async (snapshot, context) => {
+    const notification = snapshot.val();
+    console.log("Nova notificação detectada:", context.params.notificationId);
+    
+    if (!notification) return;
+
+    // Verifica se a notificação tem um destinatário (userId)
+    const userId = notification.userId;
+    if (!userId) {
+        console.log("Notificação sem userId, push ignorado.");
+        return;
+    }
+
+    try {
+        // Busca o token de push do usuário no banco de dados
+        const userSnapshot = await admin.database().ref(`/users/${userId}`).once('value');
+        const userData = userSnapshot.val();
+
+        if (!userData || !userData.pushToken) {
+            console.log(`Usuário ${userId} não possui pushToken cadastrado.`);
+            return;
+        }
+        console.log(`Enviando push para ${userId} (Token: ${userData.pushToken})`);
+
+        // Monta a mensagem para a API da Expo
+        const message = {
+            to: userData.pushToken,
+            sound: 'default',
+            title: notification.title || 'Nova Notificação',
+            body: notification.description || 'Você tem uma nova mensagem no app.',
+            data: { 
+                notificationId: context.params.notificationId,
+                type: notification.type 
+            },
+        };
+
+        // Envia para a Expo Push API
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Accept-encoding': 'gzip, deflate',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify([message]),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Erro na API da Expo (${response.status}):`, errorText);
+        } else {
+            const data = await response.json();
+            console.log("Push enviado com sucesso:", JSON.stringify(data));
+        }
+        
+    } catch (error) {
+        console.error("Erro ao enviar push notification:", error);
     }
 });
 

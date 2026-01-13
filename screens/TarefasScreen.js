@@ -167,7 +167,9 @@ export const TarefasScreen = ({ navigation }) => {
 
       {/* FAB Add Button */}
       <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('TarefasForm')}>
-        <Plus size={24} color="white" />
+        <View pointerEvents="none">
+            <Plus size={24} color="white" />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -223,5 +225,5 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: '#94a3b8', fontSize: 16 },
   
-  fab: { position: 'absolute', bottom: 110, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primaryGreen, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  fab: { position: 'absolute', bottom: 110, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primaryGreen, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, zIndex: 999 },
 });

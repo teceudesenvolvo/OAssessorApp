@@ -37,7 +37,6 @@ import { TarefasFormScreen } from './screens/subpages/TarefasFormScreen';
 import { API_BASE_URL, auth } from './ApiConfig';
 import { EditProfileScreen } from './screens/configPages/EditProfileScreen';
 import { HelpScreen } from './screens/configPages/HelpScreen';
-import { NotificationSettingsScreen } from './screens/configPages/NotificationSettingsScreen';
 import { SecurityScreen } from './screens/configPages/SecurityScreen';
 
 const Stack = createNativeStackNavigator();
@@ -79,7 +78,7 @@ const AnimatedTabBarIcon = ({ focused, color, size, icon: Icon }) => {
   }, [focused]);
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={{ transform: [{ scale }] }} pointerEvents="none">
       <Icon size={size} color={color} strokeWidth={focused ? 3 : 2} />
     </Animated.View>
   );
@@ -120,9 +119,9 @@ function DashboardTabs({ route, navigation }) {
             bottom: 0, // Define a posição base fixa
             left: 10,
             right: 10,
-            backgroundColor: 'rgba(255, 255, 255, 0.5)',
+            backgroundColor: 'rgba(255, 255, 255, 1)',
             borderTopWidth: 0,
-            height: 90,
+            height: 80,
             borderRadius: 40,
             paddingTop: 10,
             paddingBottom: Platform.OS === 'ios' ? 0 : 0,
@@ -131,6 +130,7 @@ function DashboardTabs({ route, navigation }) {
             shadowOffset: { width: 0, height: 10 },
             shadowOpacity: 0.1,
             shadowRadius: 20,
+            zIndex: 1,
           },
           { transform: [{ translateY: slideAnim }] }, // Anima a translação vertical
         ],
@@ -214,8 +214,8 @@ export default function App() {
     });
 
     return () => {
-      if (notificationListener.current) Notifications.removeNotificationSubscription(notificationListener.current);
-      if (responseListener.current) Notifications.removeNotificationSubscription(responseListener.current);
+      notificationListener.current && notificationListener.current.remove();
+      responseListener.current && responseListener.current.remove();
     };
   }, []);
 
@@ -275,7 +275,6 @@ export default function App() {
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Security" component={SecurityScreen} />
         <Stack.Screen name="Help" component={HelpScreen} />
-        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

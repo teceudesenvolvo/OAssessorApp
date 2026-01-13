@@ -84,6 +84,23 @@ export const TarefasFormScreen = ({ navigation }) => {
                 body: JSON.stringify(payload)
             });
 
+            // Criar Notificação de Nova Tarefa
+            await fetch(`${API_BASE_URL}/notificacoes.json`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: 'Nova Tarefa',
+                    description: `Nova atividade "${titulo}" agendada para ${date.toLocaleDateString('pt-BR')}.`,
+                    type: 'task',
+                    read: false,
+                    createdAt: new Date().toISOString(),
+                    userId: user.uid,
+                    creatorId: user.uid,
+                    adminId: adminId,
+                    userEmail: user.email
+                })
+            });
+
             Alert.alert('Sucesso', 'Tarefa agendada com sucesso!');
             navigation.goBack();
         } catch (error) {

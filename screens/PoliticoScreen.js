@@ -14,6 +14,7 @@ export const PoliticoScreen = ({ navigation }) => {
   const [aniversariantesList, setAniversariantesList] = useState([]);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [voterGrowth, setVoterGrowth] = useState(0);
 
   const calculateAge = (birthDateString) => {
     if (!birthDateString) return 0;
@@ -42,14 +43,34 @@ export const PoliticoScreen = ({ navigation }) => {
         if (dataEleitores) {
             myEleitores = Object.keys(dataEleitores)
                 .map(key => ({ id: key, ...dataEleitores[key] }))
-                .filter(item => item.creatorId === user.uid);
+                .filter(item => item.creatorId === user.uid || item.adminId === user.uid);
         }
         setTotalEleitores(myEleitores.length);
+
+        // Calcular crescimento (Novos eleitores este mês / Total anterior)
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        const currentMonthCount = myEleitores.filter(e => {
+            if (!e.createdAt) return false;
+            const d = new Date(e.createdAt);
+            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        }).length;
+
+        const previousTotal = myEleitores.length - currentMonthCount;
+        let growth = 0;
+        if (previousTotal > 0) {
+            growth = (currentMonthCount / previousTotal) * 100;
+        } else if (myEleitores.length > 0) {
+            growth = 100;
+        }
+        setVoterGrowth(growth);
 
         // 2. Filtrar Aniversariantes
         const today = new Date();
         const currentDay = today.getDate();
-        const currentMonth = today.getMonth() + 1;
+        const currentMonthBirthday = today.getMonth() + 1;
 
         const birthdays = myEleitores.filter(e => {
             if (!e.nascimento) return false;
@@ -57,7 +78,7 @@ export const PoliticoScreen = ({ navigation }) => {
             if (parts.length !== 3) return false;
             const day = parseInt(parts[0], 10);
             const month = parseInt(parts[1], 10);
-            return day === currentDay && month === currentMonth;
+            return day === currentDay && month === currentMonthBirthday;
         }).map(e => ({
             id: e.id,
             nome: e.nome,
@@ -83,16 +104,26 @@ export const PoliticoScreen = ({ navigation }) => {
         const responseTarefas = await fetch(`${API_BASE_URL}/tarefas.json`);
         const dataTarefas = await responseTarefas.json();
         let countTarefas = 0;
+        let overdueTasks = [];
         if (dataTarefas) {
             countTarefas = Object.values(dataTarefas).filter(
                 item => item.creatorId === user.uid && item.status === 'pending'
             ).length;
+            
+            // Identificar tarefas atrasadas
+            const now = new Date();
+            overdueTasks = Object.values(dataTarefas).filter(item => {
+                if (item.creatorId !== user.uid || item.status !== 'pending' || !item.fullDate) return false;
+                return new Date(item.fullDate) < now;
+            });
         }
         setPendingTasksCount(countTarefas);
 
         // 5. Buscar Notificações (Contar não lidas)
         const responseNotificacoes = await fetch(`${API_BASE_URL}/notificacoes.json`);
         const dataNotificacoes = await responseNotificacoes.json();
+        const notificationsList = dataNotificacoes ? Object.values(dataNotificacoes) : [];
+
         let countNotificacoes = 0;
         if (dataNotificacoes) {
             const userEmail = user.email;
@@ -103,6 +134,63 @@ export const PoliticoScreen = ({ navigation }) => {
             }).length;
         }
         setUnreadNotificationsCount(countNotificacoes);
+
+        // --- GERAÇÃO AUTOMÁTICA DE NOTIFICAÇÕES ---
+        const todayStr = new Date().toDateString();
+
+        // 1. Notificar Aniversariantes (se ainda não notificado hoje)
+        for (const person of birthdays) {
+            const alreadyNotified = notificationsList.some(n => 
+                n.type === 'birthday' && 
+                n.description.includes(person.nome) && 
+                new Date(n.createdAt).toDateString() === todayStr
+            );
+
+            if (!alreadyNotified) {
+                await fetch(`${API_BASE_URL}/notificacoes.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: 'Aniversariante do Dia',
+                        description: `Hoje é o aniversário de ${person.nome}. Envie uma mensagem!`,
+                        type: 'birthday',
+                        read: false,
+                        createdAt: new Date().toISOString(),
+                        userId: user.uid,
+                        creatorId: user.uid,
+                        adminId: user.uid,
+                        userEmail: user.email
+                    })
+                });
+            }
+        }
+
+        // 2. Notificar Tarefas Atrasadas (se ainda não notificado hoje)
+        for (const task of overdueTasks) {
+            const alreadyNotified = notificationsList.some(n => 
+                n.type === 'alert' && 
+                n.description.includes(task.titulo) && 
+                new Date(n.createdAt).toDateString() === todayStr
+            );
+
+            if (!alreadyNotified) {
+                await fetch(`${API_BASE_URL}/notificacoes.json`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: 'Tarefa Atrasada',
+                        description: `A tarefa "${task.titulo}" está pendente e atrasada.`,
+                        type: 'alert', // Usando um tipo de alerta (pode mapear ícone depois)
+                        read: false,
+                        createdAt: new Date().toISOString(),
+                        userId: user.uid,
+                        creatorId: user.uid,
+                        adminId: user.uid,
+                        userEmail: user.email
+                    })
+                });
+            }
+        }
 
     } catch (error) {
         console.error("Erro ao carregar dashboard:", error);
@@ -155,7 +243,7 @@ export const PoliticoScreen = ({ navigation }) => {
             <Text style={styles.cardLabel}>Total de Eleitores</Text>
             <Text style={styles.cardValue}>{totalEleitores}</Text>
             <Text style={styles.cardTrend}>
-              +12.5% este mês
+              {voterGrowth > 0 ? '+' : ''}{voterGrowth.toFixed(1)}% este mês
             </Text>
           </View>
           <View style={styles.iconBoxBlue}>
