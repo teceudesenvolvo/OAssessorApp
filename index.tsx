@@ -202,7 +202,10 @@ export default function App() {
 
   useEffect(() => {
     // Registrar para notificações Push
-    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
+    registerForPushNotificationsAsync().then(token => {
+      console.log("Token Push Gerado:", token);
+      setExpoPushToken(token);
+    });
 
     // Listeners para notificações
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
@@ -219,19 +222,29 @@ export default function App() {
     };
   }, []);
 
+  // Novo useEffect dedicado apenas para salvar o token quando Usuário e Token existirem
+  useEffect(() => {
+    if (user && expoPushToken) {
+      const saveToken = async () => {
+        try {
+          await fetch(`${API_BASE_URL}/users/${user.uid}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pushToken: expoPushToken })
+          });
+          console.log("SUCESSO: Token salvo/atualizado no Firebase para o usuário", user.uid);
+        } catch (err) {
+          console.error("ERRO ao salvar token no Firebase:", err);
+        }
+      };
+      saveToken();
+    }
+  }, [user, expoPushToken]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
-        // Se tiver token e usuário, salva no Firebase
-        if (expoPushToken) {
-          fetch(`${API_BASE_URL}/users/${u.uid}.json`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pushToken: expoPushToken })
-          }).catch(err => console.log("Erro ao salvar token:", err));
-        }
-
         try {
           const response = await fetch(`${API_BASE_URL}/users/${u.uid}.json`);
           const userData = await response.json();
@@ -247,7 +260,7 @@ export default function App() {
       if (initializing) setInitializing(false);
     });
     return unsubscribe;
-  }, [expoPushToken]); // Adicionado dependência do token para salvar assim que disponível
+  }, []); 
 
   if (initializing) {
     return (
@@ -298,7 +311,8 @@ async function registerForPushNotificationsAsync() {
     });
   }
 
-  if (Device.isDevice) {
+  // Permite execução em Dispositivo Físico ou Emulador Android (Simulador iOS não suporta Push)
+  if (Device.isDevice || Platform.OS === 'android') {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== 'granted') {
@@ -306,13 +320,22 @@ async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-      // alert('Falha ao obter permissão para notificações push!');
+      console.log('Falha: Permissão de notificações não concedida.');
       return;
     }
     const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    
+    if (!projectId) {
+      console.warn("AVISO: Project ID não encontrado. Verifique seu app.json ou eas.json.");
+    }
+
+    try {
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    } catch (e) {
+      console.error("Erro ao obter Push Token:", e);
+    }
   } else {
-    // alert('Must use physical device for Push Notifications');
+    console.log('Push Notifications não suportadas em Simulador iOS.');
   }
 
   return token;

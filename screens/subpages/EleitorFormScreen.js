@@ -117,6 +117,7 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
         // ID do usuário logado que está criando o eleitor
         const creatorId = auth.currentUser?.uid;
         const user = auth.currentUser;
+        const token = user ? await user.getIdToken() : '';
 
         try {
             const payload = {
@@ -139,11 +140,11 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
             };
 
             // Buscar dados do usuário para obter adminId
-            const responseUser = await fetch(`${API_BASE_URL}/users/${creatorId}.json`);
+            const responseUser = await fetch(`${API_BASE_URL}/users/${creatorId}.json?auth=${token}`);
             const userData = await responseUser.json();
             const adminId = userData?.adminId || creatorId;
 
-            const response = await fetch(`${API_BASE_URL}/eleitores.json`, {
+            const response = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -152,7 +153,7 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
             if (!response.ok) throw new Error('Falha ao salvar');
 
             // Criar Notificação de Novo Eleitor
-            await fetch(`${API_BASE_URL}/notificacoes.json`, {
+            await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

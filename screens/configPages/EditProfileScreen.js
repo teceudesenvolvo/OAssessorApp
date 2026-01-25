@@ -37,7 +37,8 @@ export const EditProfileScreen = ({ navigation }) => {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+            const token = await user.getIdToken();
+            const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
             const data = await response.json();
 
             if (data) {
@@ -66,8 +67,10 @@ export const EditProfileScreen = ({ navigation }) => {
         }
         setLoading(true);
         try {
+            const user = auth.currentUser;
+            const token = user ? await user.getIdToken() : '';
             const payload = { nome: name, telefone: phone, updatedAt: new Date().toISOString() };
-            await fetch(`${API_BASE_URL}/users/${auth.currentUser.uid}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             Alert.alert('Sucesso', 'Seus dados foram atualizados!');
             navigation.goBack();
         } catch (error) {
@@ -101,7 +104,7 @@ export const EditProfileScreen = ({ navigation }) => {
             const { token } = await response.json();
 
             // 3. Abre a URL passando o token e o email
-            await WebBrowser.openBrowserAsync(`https://oassessor.vercel.app/dashboard?token=${token}&email=${user.email}`);
+            await WebBrowser.openBrowserAsync(`https://oassessor.vercel.app/dashboard/profile?token=${token}&email=${user.email}`);
         } catch (error) {
             Alert.alert('Erro', 'Não foi possível acessar o painel web.');
             console.error(error);

@@ -34,9 +34,10 @@ export const PoliticoScreen = ({ navigation }) => {
     try {
         const user = auth.currentUser;
         if (!user) return;
+        const token = await user.getIdToken();
 
         // 1. Buscar Eleitores
-        const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json`);
+        const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
         const dataEleitores = await responseEleitores.json();
         let myEleitores = [];
         
@@ -89,7 +90,7 @@ export const PoliticoScreen = ({ navigation }) => {
         setAniversariantesList(birthdays);
 
         // 3. Buscar Assessores
-        const responseAssessores = await fetch(`${API_BASE_URL}/assessores.json`);
+        const responseAssessores = await fetch(`${API_BASE_URL}/assessores.json?auth=${token}`);
         const dataAssessores = await responseAssessores.json();
         let myAssessores = [];
 
@@ -101,7 +102,7 @@ export const PoliticoScreen = ({ navigation }) => {
         setAssessoresList(myAssessores);
 
         // 4. Buscar Tarefas (Atividades Pendentes)
-        const responseTarefas = await fetch(`${API_BASE_URL}/tarefas.json`);
+        const responseTarefas = await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`);
         const dataTarefas = await responseTarefas.json();
         let countTarefas = 0;
         let overdueTasks = [];
@@ -120,7 +121,7 @@ export const PoliticoScreen = ({ navigation }) => {
         setPendingTasksCount(countTarefas);
 
         // 5. Buscar Notificações (Contar não lidas)
-        const responseNotificacoes = await fetch(`${API_BASE_URL}/notificacoes.json`);
+        const responseNotificacoes = await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`);
         const dataNotificacoes = await responseNotificacoes.json();
         const notificationsList = dataNotificacoes ? Object.values(dataNotificacoes) : [];
 
@@ -147,7 +148,7 @@ export const PoliticoScreen = ({ navigation }) => {
             );
 
             if (!alreadyNotified) {
-                await fetch(`${API_BASE_URL}/notificacoes.json`, {
+                await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -174,7 +175,7 @@ export const PoliticoScreen = ({ navigation }) => {
             );
 
             if (!alreadyNotified) {
-                await fetch(`${API_BASE_URL}/notificacoes.json`, {
+                await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -228,7 +229,7 @@ export const PoliticoScreen = ({ navigation }) => {
             </Text>
           </View>
           <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
-            <Bell size={24} color="white" />
+            <Bell size={24} color="white" onPress={() => navigation.navigate('Notificacoes')} />
             {unreadNotificationsCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{unreadNotificationsCount}</Text>

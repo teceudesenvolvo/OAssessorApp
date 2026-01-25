@@ -55,9 +55,10 @@ export const TarefasFormScreen = ({ navigation }) => {
                 Alert.alert('Erro', 'Usuário não autenticado.');
                 return;
             }
+            const token = await user.getIdToken();
 
             // Buscar dados do usuário para verificar se é assessor e pegar o adminId
-            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
             const userData = await responseUser.json();
 
             let adminId = user.uid; // Se for político, ele é o admin
@@ -78,14 +79,14 @@ export const TarefasFormScreen = ({ navigation }) => {
                 createdAt: new Date().toISOString()
             };
 
-            await fetch(`${API_BASE_URL}/tarefas.json`, {
+            await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
             // Criar Notificação de Nova Tarefa
-            await fetch(`${API_BASE_URL}/notificacoes.json`, {
+            await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

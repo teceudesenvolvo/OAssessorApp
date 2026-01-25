@@ -1,11 +1,89 @@
 // Tela de Político
+import { useFocusEffect } from '@react-navigation/native';
 import { AlertTriangle, BarChart3, Bell, Users } from 'lucide-react-native';
-import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_BASE_URL, auth } from '../ApiConfig';
 
 export const AssessorScreen = ({ navigation }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { width, height } = Dimensions.get('window');
+
+  const [loading, setLoading] = useState(true);
+  const [totalEleitores, setTotalEleitores] = useState(0);
+  const [voterGrowth, setVoterGrowth] = useState(0);
+  const [engagement, setEngagement] = useState(0);
+  const [overdueTasks, setOverdueTasks] = useState(0);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+        
+        const token = await user.getIdToken();
+
+        // 1. Fetch voters created by the assessor
+        const eleitoresResponse = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
+        const eleitoresData = await eleitoresResponse.json();
+        let myEleitores = [];
+        if (eleitoresData) {
+            myEleitores = Object.values(eleitoresData).filter(
+                eleitor => eleitor.creatorId === user.uid
+            );
+        }
+        setTotalEleitores(myEleitores.length);
+
+        // Calculate growth
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        const currentMonthCount = myEleitores.filter(e => {
+            if (!e.createdAt) return false;
+            const d = new Date(e.createdAt);
+            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        }).length;
+
+        const previousTotal = myEleitores.length - currentMonthCount;
+        let growth = 0;
+        if (previousTotal > 0) {
+            growth = (currentMonthCount / previousTotal) * 100;
+        } else if (myEleitores.length > 0) {
+            growth = 100; // All voters are new this month
+        }
+        setVoterGrowth(growth);
+
+        // 2. Calculate Engagement (e.g., percentage of 'Apoiador')
+        if (myEleitores.length > 0) {
+            const apoiadores = myEleitores.filter(e => e.status === 'Apoiador').length;
+            setEngagement((apoiadores / myEleitores.length) * 100);
+        } else {
+            setEngagement(0);
+        }
+
+        // 3. Fetch overdue tasks for the assessor
+        const tarefasResponse = await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`);
+        const tarefasData = await tarefasResponse.json();
+        let overdueCount = 0;
+        if (tarefasData) {
+            const now = new Date();
+            overdueCount = Object.values(tarefasData).filter(
+                task => task.creatorId === user.uid && task.status === 'pending' && task.fullDate && new Date(task.fullDate) < now
+            ).length;
+        }
+        setOverdueTasks(overdueCount);
+
+    } catch (error) {
+        console.error("Erro ao carregar dashboard do assessor:", error);
+        Alert.alert('Erro', 'Não foi possível carregar os dados do dashboard.');
+    } finally {
+        setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Calcula a escala inicial para cobrir a tela (diagonal total)
@@ -20,6 +98,10 @@ export const AssessorScreen = ({ navigation }) => {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    fetchData();
+  }, []));
 
   return (
     <View style={styles.container}>
@@ -42,9 +124,9 @@ export const AssessorScreen = ({ navigation }) => {
         <View style={styles.mainCard}>
           <View>
             <Text style={styles.cardLabel}>Total de Eleitores</Text>
-            <Text style={styles.cardValue}>12.450</Text>
+            <Text style={styles.cardValue}>{loading ? '...' : totalEleitores}</Text>
             <Text style={styles.cardTrend}>
-              +12.5% este mês
+              {loading ? '' : `${voterGrowth >= 0 ? '+' : ''}${voterGrowth.toFixed(1)}% este mês`}
             </Text>
           </View>
           <View style={styles.iconBoxBlue}>
@@ -57,35 +139,37 @@ export const AssessorScreen = ({ navigation }) => {
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <BarChart3 color="#10b981" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Engajamento</Text>
-            <Text style={styles.statValue}>78.4%</Text>
+            <Text style={styles.statLabel}>Engajamento (Apoiadores)</Text>
+            <Text style={styles.statValue}>{loading ? '...' : `${engagement.toFixed(1)}%`}</Text>
           </View>
           <View style={styles.statCard}>
             <AlertTriangle color="#f43f5e" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Ocorrências</Text>
-            <Text style={styles.statValue}>23</Text>
+            <Text style={styles.statLabel}>Tarefas Atrasadas</Text>
+            <Text style={styles.statValue}>{loading ? '...' : overdueTasks}</Text>
           </View>
         </View>
 
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Content */}
-        <View style={styles.contentContainer}>
-
-
-          <View style={{ marginTop: 70, }}>
-            <Text style={styles.sectionTitle}>Intensidade por Região</Text>
-            <View style={styles.mapContainer}>
-              <View style={styles.mapCircle1} />
-              <View style={styles.mapCircle2} />
-              <View style={styles.mapLabel}>
-                <Text style={styles.mapLabelText}>VISUALIZAÇÃO GIS</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 80 }} />
+      ) : (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
+          {/* Content */}
+          <View style={styles.contentContainer}>
+            <View style={{ marginTop: 70, }}>
+              <Text style={styles.sectionTitle}>Intensidade por Região</Text>
+              <View style={styles.mapContainer}>
+                <View style={styles.mapCircle1} />
+                <View style={styles.mapCircle2} />
+                <View style={styles.mapLabel}>
+                  <Text style={styles.mapLabelText}>VISUALIZAÇÃO GIS</Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Círculo de Transição (Reveal) */}
       <Animated.View

@@ -103,7 +103,10 @@ export const AssessorFormScreen = ({ navigation }) => {
         };
 
         try {
-            const response = await fetch(`${API_BASE_URL}/assessores.json`, {
+            const user = auth.currentUser;
+            const token = user ? await user.getIdToken() : '';
+
+            const response = await fetch(`${API_BASE_URL}/assessores.json?auth=${token}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -114,26 +117,6 @@ export const AssessorFormScreen = ({ navigation }) => {
             if (!response.ok) throw new Error('Erro ao salvar');
 
             const data = await response.json();
-            const newId = data.name;
-
-            // Salvar também na coleção users usando o ID gerado
-            await fetch(`${API_BASE_URL}/users/${newId}.json`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(assessorData)
-            });
-
-            Alert.alert(
-                'Sucesso',
-                'Assessor cadastrado com sucesso! Deseja enviar o convite por email?',
-                [
-                    { text: 'Agora não', onPress: () => navigation.goBack(), style: 'cancel' },
-                    { text: 'Enviar Convite', onPress: async () => {
-                        await sendInviteEmail(nome, email);
-                        navigation.goBack();
-                    }}
-                ]
-            );
         } catch (error) {
             Alert.alert('Erro', 'Não foi possível cadastrar o assessor. Verifique sua conexão.');
             console.error(error);

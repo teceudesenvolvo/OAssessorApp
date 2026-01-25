@@ -20,16 +20,17 @@ export const EleitorCadastroScreen = ({ navigation }) => {
     const [eleitores, setEleitores] = useState([]);
     const [loading, setLoading] = useState(true);
     const [plano, setPlano] = useState('');
-    const LIMIT = 2000;
+    const [limit, setLimit] = useState(200); // Limite padrão
 
     const fetchData = async () => {
         try {
             setLoading(true);
             const user = auth.currentUser;
             if (!user) return;
+            const token = await user.getIdToken();
 
             // 1. Buscar Eleitores e filtrar pelo ID do usuário logado
-            const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json`);
+            const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
             const dataEleitores = await responseEleitores.json();
             
             const loadedEleitores = [];
@@ -44,10 +45,22 @@ export const EleitorCadastroScreen = ({ navigation }) => {
 
             // 2. Buscar dados do usuário para pegar o tipoPlano
             // Assumindo que os usuários estão salvos em users/{uid}
-            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
             const dataUser = await responseUser.json();
             if (dataUser && dataUser.tipoPlano) {
                 setPlano(dataUser.tipoPlano);
+                // Define o limite com base no plano do usuário
+                switch (dataUser.tipoPlano) {
+                    case 'pro':
+                        setLimit(2000);
+                        break;
+                    case 'premium':
+                        setLimit(10000);
+                        break;
+                    default: // 'basic' ou qualquer outro
+                        setLimit(200);
+                        break;
+                }
             }
 
         } catch (error) {
@@ -125,13 +138,13 @@ export const EleitorCadastroScreen = ({ navigation }) => {
                             <Text style={styles.textWhite}>Eleitores</Text>
                         </Text>
                         <Text style={styles.limitText}>
-                            {eleitores.length} de {LIMIT} cadastros
+                            {eleitores.length} de {limit} cadastros
                         </Text>
                         <View style={styles.progressBarContainer}>
                             <View 
                                 style={[
                                     styles.progressBarFill, 
-                                    { width: `${Math.min((eleitores.length / LIMIT) * 100, 100)}%` }
+                                    { width: `${Math.min((eleitores.length / limit) * 100, 100)}%` }
                                 ]} 
                             />
                         </View>

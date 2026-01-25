@@ -14,7 +14,8 @@ export const NotificacoesScreen = ({ navigation }) => {
       const user = auth.currentUser;
       if (!user) return;
 
-      const response = await fetch(`${API_BASE_URL}/notificacoes.json`);
+      const token = await user.getIdToken();
+      const response = await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`);
       const data = await response.json();
 
       if (data) {
@@ -51,7 +52,9 @@ export const NotificacoesScreen = ({ navigation }) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
 
     try {
-      await fetch(`${API_BASE_URL}/notificacoes/${id}.json`, {
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : '';
+      await fetch(`${API_BASE_URL}/notificacoes/${id}.json?auth=${token}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ read: true })

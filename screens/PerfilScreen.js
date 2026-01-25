@@ -22,7 +22,8 @@ export const PerfilScreen = ({ navigation }) => {
         if (!user) return;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+            const token = await user.getIdToken();
+            const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
             const data = await response.json();
             setUserData(data);
         } catch (error) {
@@ -88,7 +89,8 @@ export const PerfilScreen = ({ navigation }) => {
         if (!user) return;
 
         try {
-            await fetch(`${API_BASE_URL}/notificacoes.json`, {
+            const token = await user.getIdToken();
+            await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

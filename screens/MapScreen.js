@@ -40,7 +40,8 @@ export const MapScreen = () => {
       try {
         const user = auth.currentUser;
         if (user) {
-          const response = await fetch(`${API_BASE_URL}/eleitores.json`);
+          const token = await user.getIdToken();
+          const response = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
           const data = await response.json();
           if (data) {
             myEleitores = Object.keys(data)

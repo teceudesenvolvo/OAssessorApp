@@ -3,7 +3,6 @@ const functions = require("firebase-functions/v1");
 // const { onValueCreated } = require("firebase-functions/v2/database");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
-const fetch = require("node-fetch");
 
 admin.initializeApp();
 
@@ -73,7 +72,7 @@ exports.sendPushOnNotification = functions.database.ref("/notificacoes/{notifica
         const userData = userSnapshot.val();
 
         if (!userData || !userData.pushToken) {
-            console.log(`Usuário ${userId} não possui pushToken cadastrado.`);
+            console.log(`FALHA: Usuário ${userId} encontrado? ${!!userData}. Token existe? ${!!userData?.pushToken}`);
             return;
         }
         console.log(`Enviando push para ${userId} (Token: ${userData.pushToken})`);
@@ -84,6 +83,10 @@ exports.sendPushOnNotification = functions.database.ref("/notificacoes/{notifica
             sound: 'default',
             title: notification.title || 'Nova Notificação',
             body: notification.description || 'Você tem uma nova mensagem no app.',
+            priority: 'high',
+            channelId: 'default',
+            contentAvailable: true,
+            mutableContent: true,
             data: { 
                 notificationId: context.params.notificationId,
                 type: notification.type 
@@ -95,22 +98,41 @@ exports.sendPushOnNotification = functions.database.ref("/notificacoes/{notifica
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
-                'Accept-encoding': 'gzip, deflate',
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify([message]),
         });
 
+        const responseBody = await response.json();
+
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Erro na API da Expo (${response.status}):`, errorText);
-        } else {
-            const data = await response.json();
-            console.log("Push enviado com sucesso:", JSON.stringify(data));
+            console.error(`Erro na API da Expo (${response.status}):`, JSON.stringify(responseBody));
+            return;
         }
         
+        console.log("Resposta da Expo:", JSON.stringify(responseBody));
+
+        // Verificação detalhada do ticket de notificação
+        const ticket = responseBody.data[0];
+        if (ticket.status === 'error') {
+            console.error(`Erro no ticket de push: ${ticket.message}`);
+            if (ticket.details && ticket.details.error) {
+                console.error(`Detalhe do erro: ${ticket.details.error}`);
+                // Se o erro for DeviceNotRegistered, podemos remover o token do banco
+                if (ticket.details.error === 'DeviceNotRegistered') {
+                    await admin.database().ref(`/users/${userId}/pushToken`).remove();
+                    console.log(`Token inválido removido para o usuário ${userId}`);
+                }
+            }
+        } else {
+            console.log(`Push enviado com sucesso, ticket ID: ${ticket.id}`);
+        }
     } catch (error) {
         console.error("Erro ao enviar push notification:", error);
+        // Diagnóstico específico para Plano Spark vs Blaze
+        if (error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN' || error.message.includes('network')) {
+            console.error("ALERTA CRÍTICO: Erro de rede detectado. Se você estiver no plano 'Spark' (gratuito) do Firebase, chamadas para APIs externas (como a da Expo) são BLOQUEADAS. Faça upgrade para o plano 'Blaze' (Pay as you go).");
+        }
     }
 });
 

@@ -14,14 +14,15 @@ export const TarefasScreen = ({ navigation }) => {
       setLoading(true);
       const user = auth.currentUser;
       if (!user) return;
+      const token = await user.getIdToken();
 
       // 1. Buscar dados do usuário para saber o tipo (Assessor ou Político)
-      const userResp = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
+      const userResp = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
       const userData = await userResp.json();
       const isAssessor = userData?.tipoUser === 'assessor';
 
       // 2. Buscar todas as tarefas
-      const tasksResp = await fetch(`${API_BASE_URL}/tarefas.json`);
+      const tasksResp = await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`);
       const tasksData = await tasksResp.json();
 
       if (tasksData) {
@@ -64,7 +65,9 @@ export const TarefasScreen = ({ navigation }) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
 
     try {
-      await fetch(`${API_BASE_URL}/tarefas/${id}.json`, {
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : '';
+      await fetch(`${API_BASE_URL}/tarefas/${id}.json?auth=${token}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -139,7 +142,11 @@ export const TarefasScreen = ({ navigation }) => {
           ) : (
             filteredTasks.map((item) => (
               <TouchableOpacity key={item.id} style={styles.taskCard} onPress={() => navigation.navigate('TarefasEdit', { task: item })}>
-                <TouchableOpacity style={styles.taskIcon} onPress={() => toggleTask(item.id)}>
+                <TouchableOpacity 
+                  style={styles.taskIcon} 
+                  onPress={() => toggleTask(item.id)}
+                  hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                >
                   {item.status === 'done' ? (
                     <CheckCircle size={24} color="#10b981" />
                   ) : (
