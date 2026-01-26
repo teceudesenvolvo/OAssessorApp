@@ -15,6 +15,7 @@ export const PoliticoScreen = ({ navigation }) => {
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [voterGrowth, setVoterGrowth] = useState(0);
+  const [tipoUser, setTipoUser] = useState('');
 
   const calculateAge = (birthDateString) => {
     if (!birthDateString) return 0;
@@ -35,6 +36,10 @@ export const PoliticoScreen = ({ navigation }) => {
         const user = auth.currentUser;
         if (!user) return;
         const token = await user.getIdToken();
+
+        const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
+        const dataUser = await responseUser.json();
+        setTipoUser(dataUser?.tipoUser || '');
 
         // 1. Buscar Eleitores
         const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
@@ -255,16 +260,18 @@ export const PoliticoScreen = ({ navigation }) => {
 
         </View>
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, tipoUser !== 'admin' && { width: '100%' }]}>
             <Calendar color="#f59e0b" size={28} style={{ marginBottom: 8 }} />
             <Text style={styles.statLabel}>Atividades Pendentes</Text>
             <Text style={styles.statValue}>{pendingTasksCount}</Text>
           </View>
-          <View style={styles.statCard}>
-            <Users color="#3b82f6" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Minha Equipe</Text>
-            <Text style={styles.statValue}>{assessoresList.length} de 10</Text>
-          </View>
+          {tipoUser === 'admin' && (
+            <View style={styles.statCard}>
+              <Users color="#3b82f6" size={28} style={{ marginBottom: 8 }} />
+              <Text style={styles.statLabel}>Minha Equipe</Text>
+              <Text style={styles.statValue}>{assessoresList.length} de 10</Text>
+            </View>
+          )}
         </View>
 
       </View>
@@ -274,40 +281,42 @@ export const PoliticoScreen = ({ navigation }) => {
         <View style={styles.contentContainer}>
 
 
-          <View style={{ marginTop: 70 }}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Minha Equipe</Text>
-              <TouchableOpacity style={styles.addButtonSmall} onPress={() => navigation.navigate('AssessorForm')}>
-                <Plus size={16} color="#fff" />
-                <Text style={styles.addButtonText}>Novo</Text>
-              </TouchableOpacity>
+          {tipoUser === 'admin' && (
+            <View style={{ marginTop: 70 }}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Minha Equipe</Text>
+                <TouchableOpacity style={styles.addButtonSmall} onPress={() => navigation.navigate('AssessorForm')}>
+                  <Plus size={16} color="#fff" />
+                  <Text style={styles.addButtonText}>Novo</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={{ marginHorizontal: -24 }}
+                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 10 }}
+              >
+                {assessoresList.length === 0 ? (
+                  <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum assessor cadastrado.</Text>
+                ) : (
+                  assessoresList.map((item) => (
+                    <TouchableOpacity key={item.id} style={styles.assessorCard} onPress={() => navigation.navigate('AssessorEdit', { assessor: item })}>
+                      <View style={styles.avatarContainer}><Text style={styles.avatarText}>{item.nome.charAt(0)}</Text></View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.assessorName}>{item.nome}</Text>
+                        <Text style={styles.assessorRole}>{item.cargo}</Text>
+                        <Text style={styles.assessorRole}>{item.qtdCadastros || 0} Eleitores</Text>
+                      </View>
+                      <ChevronRight size={20} color="#cbd5e1" />
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
             </View>
+          )}
 
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={{ marginHorizontal: -24 }}
-              contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 10 }}
-            >
-              {assessoresList.length === 0 ? (
-                <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum assessor cadastrado.</Text>
-              ) : (
-                assessoresList.map((item) => (
-                  <TouchableOpacity key={item.id} style={styles.assessorCard} onPress={() => navigation.navigate('AssessorEdit', { assessor: item })}>
-                    <View style={styles.avatarContainer}><Text style={styles.avatarText}>{item.nome.charAt(0)}</Text></View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.assessorName}>{item.nome}</Text>
-                      <Text style={styles.assessorRole}>{item.cargo}</Text>
-                      <Text style={styles.assessorRole}>{item.qtdCadastros || 0} Eleitores</Text>
-                    </View>
-                    <ChevronRight size={20} color="#cbd5e1" />
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-          </View>
-
-          <View>
+          <View style={tipoUser !== 'admin' ? { marginTop: 70 } : {}}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Aniversariantes do Dia</Text>
             </View>

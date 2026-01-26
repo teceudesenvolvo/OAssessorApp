@@ -222,10 +222,12 @@ export const EditProfileScreen = ({ navigation }) => {
                             )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.button, { backgroundColor: '#334155', marginTop: 16 }]} onPress={handleOpenAdvancedSettings}>
-                            <Settings size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text style={styles.buttonText}>Configurações Avançadas</Text>
-                        </TouchableOpacity>
+                        {tipoUser === 'admin' && (
+                            <TouchableOpacity style={[styles.button, { backgroundColor: '#334155', marginTop: 16 }]} onPress={handleOpenAdvancedSettings}>
+                                <Settings size={20} color="white" style={{ marginRight: 8 }} />
+                                <Text style={styles.buttonText}>Configurações Avançadas</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>

@@ -16,10 +16,28 @@ export const TarefasScreen = ({ navigation }) => {
       if (!user) return;
       const token = await user.getIdToken();
 
-      // 1. Buscar dados do usuário para saber o tipo (Assessor ou Político)
-      const userResp = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-      const userData = await userResp.json();
-      const isAssessor = userData?.tipoUser === 'assessor';
+      // 1. Buscar todos os usuários e filtrar pelo ID do usuário logado
+      const usersResponse = await fetch(`${API_BASE_URL}/users.json?auth=${token}`);
+      const usersData = await usersResponse.json();
+      
+      let targetAdminId = user.uid;
+
+      if (usersData) {
+          const usersList = Object.keys(usersData).map(key => ({
+              id: key,
+              ...usersData[key]
+          }));
+
+          const currentUserData = usersList.find(u => u.id === user.uid || u.userId === user.uid);
+
+          if (currentUserData) {
+              if (currentUserData.tipoUser === 'admin') {
+                  targetAdminId = user.uid;
+              } else if (currentUserData.tipoUser === 'assessor') {
+                  targetAdminId = currentUserData.adminId;
+              }
+          }
+      }
 
       // 2. Buscar todas as tarefas
       const tasksResp = await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`);
@@ -28,18 +46,24 @@ export const TarefasScreen = ({ navigation }) => {
       if (tasksData) {
         const loadedTasks = Object.keys(tasksData).map(key => ({
           id: key,
+          status: 'pending', // Garante status padrão para tarefas antigas
           ...tasksData[key]
         })).filter(task => {
-          if (isAssessor) {
-            // Assessor vê apenas o que criou (ou poderia ver o que foi atribuído a ele)
-            return task.creatorId === user.uid;
-          } else {
-            // Político (Admin) vê tudo que está vinculado ao seu ID de admin
-            return task.adminId === user.uid;
-          }
+          return task.adminId === targetAdminId;
         });
-        // Ordenar por data (opcional, aqui invertendo para mostrar mais recentes primeiro se o ID for cronológico)
-        setTasks(loadedTasks.reverse());
+
+
+        // Ordenar por data
+        loadedTasks.sort((a, b) => {
+            if (a.fullDate && b.fullDate) {
+              return new Date(a.fullDate) - new Date(b.fullDate);
+            }
+            const dateA = a.data ? new Date(`${a.data.split('/').reverse().join('-')}T${a.time || '00:00'}`) : new Date(0);
+            const dateB = b.data ? new Date(`${b.data.split('/').reverse().join('-')}T${b.time || '00:00'}`) : new Date(0);
+            return dateA - dateB;
+        });
+
+        setTasks(loadedTasks);
       } else {
         setTasks([]);
       }

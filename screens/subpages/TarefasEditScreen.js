@@ -97,6 +97,9 @@ export const TarefasEditScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
+            const user = auth.currentUser;
+            const token = user ? await user.getIdToken() : '';
+
             const payload = {
                 titulo,
                 data: date.toLocaleDateString('pt-BR'),
@@ -107,7 +110,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                 updatedAt: new Date().toISOString()
             };
 
-            await fetch(`${API_BASE_URL}/tarefas/${task.id}.json`, {
+            await fetch(`${API_BASE_URL}/tarefas/${task.id}.json?auth=${token}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -130,6 +133,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
         const user = auth.currentUser;
         
         try {
+            const token = user ? await user.getIdToken() : '';
             const commentPayload = {
                 text: newComment,
                 userId: user?.uid,
@@ -137,7 +141,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                 createdAt: new Date().toISOString()
             };
 
-            await fetch(`${API_BASE_URL}/tarefas/${task.id}/comentarios.json`, {
+            await fetch(`${API_BASE_URL}/tarefas/${task.id}/comentarios.json?auth=${token}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(commentPayload)
@@ -163,7 +167,9 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await fetch(`${API_BASE_URL}/tarefas/${task.id}.json`, { method: 'DELETE' });
+                            const user = auth.currentUser;
+                            const token = user ? await user.getIdToken() : '';
+                            await fetch(`${API_BASE_URL}/tarefas/${task.id}.json?auth=${token}`, { method: 'DELETE' });
                             navigation.goBack();
                         } catch (error) {
                             Alert.alert('Erro', 'Não foi possível excluir a tarefa.');

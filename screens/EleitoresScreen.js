@@ -1,12 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { FileText, Filter, MapPin, Phone, Plus, Search, UserPlus } from 'lucide-react-native';
+import { FileText, Filter, Link, MapPin, Phone, Plus, Search, UserPlus } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     ScrollView,
+    Share,
     StyleSheet,
     Text,
     TextInput,
@@ -122,6 +123,21 @@ export const EleitorCadastroScreen = ({ navigation }) => {
         }
     };
 
+    const handleShareFormLink = async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const link = `https://oassessor.vercel.app/eleitor-form?email=${encodeURIComponent(user.email)}&userId=${user.uid}`;
+
+        try {
+            await Share.share({
+                message: `Cadastre-se através deste link: ${link}`,
+            });
+        } catch (error) {
+            Alert.alert('Erro', 'Não foi possível compartilhar o link.');
+        }
+    };
+
     const filteredList = eleitores.filter(e => 
         e.nome.toLowerCase().includes(searchText.toLowerCase()) ||
         e.bairro.toLowerCase().includes(searchText.toLowerCase())
@@ -199,9 +215,15 @@ export const EleitorCadastroScreen = ({ navigation }) => {
                 )}
             </ScrollView>
 
-            <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white' }]} onPress={handleExportPDF}>
+            <TouchableOpacity style={[styles.fab, { bottom: 250, backgroundColor: 'white' }]} onPress={handleExportPDF}>
                 <View pointerEvents="none">
                     <FileText size={24} color="#6EE794" />
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white' }]} onPress={handleShareFormLink}>
+                <View pointerEvents="none">
+                    <Link size={24} color="#6EE794" />
                 </View>
             </TouchableOpacity>
 

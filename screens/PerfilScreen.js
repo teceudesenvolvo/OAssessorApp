@@ -1,11 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import * as Notifications from 'expo-notifications';
 import { signOut } from 'firebase/auth';
-import { Bell, ChevronRight, HelpCircle, LogOut, Radio, Shield, UserCog } from 'lucide-react-native';
+import { ChevronRight, HelpCircle, LogOut, Radio, Shield, UserCog } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Share,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -58,6 +60,41 @@ export const PerfilScreen = ({ navigation }) => {
                         }
                     } 
                 }
+            ]
+        );
+    };
+
+    const handleShareLink = () => {
+        const user = auth.currentUser;
+        if (!user) {
+            Alert.alert('Erro', 'Você precisa estar logado para gerar o link.');
+            return;
+        }
+
+        const link = `https://oassessor.vercel.app?email=${encodeURIComponent(user.email)}&userId=${user.uid}`;
+
+        Alert.alert(
+            'Link de Acesso Web',
+            `Use o link abaixo para acessar o painel web:\n\n${link}`,
+            [
+                {
+                    text: 'Copiar Link',
+                    onPress: async () => {
+                        await Clipboard.setStringAsync(link);
+                        Alert.alert('Copiado!', 'O link foi copiado para a área de transferência.');
+                    }
+                },
+                {
+                    text: 'Compartilhar',
+                    onPress: async () => {
+                        try {
+                            await Share.share({ message: `Acesse o painel de O Assessor através deste link: ${link}` });
+                        } catch (error) {
+                            Alert.alert('Erro', 'Não foi possível compartilhar o link.');
+                        }
+                    }
+                },
+                { text: 'Fechar', style: 'cancel' }
             ]
         );
     };
@@ -154,18 +191,9 @@ export const PerfilScreen = ({ navigation }) => {
                                 </TouchableOpacity>
                             ))}
 
-                            <TouchableOpacity 
-                                style={styles.menuItem} 
-                                onPress={handleTestNotification}
-                            >
-                                <View style={styles.menuItemLeft}>
-                                    <View style={styles.iconContainer}>
-                                        <Bell size={20} color="#64748b" />
-                                    </View>
-                                    <Text style={styles.menuItemText}>Testar Notificação (Local)</Text>
-                                </View>
-                                <ChevronRight size={20} color="#cbd5e1" />
-                            </TouchableOpacity>
+                           
+
+                            
 
                             <TouchableOpacity 
                                 style={styles.menuItem} 

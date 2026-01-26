@@ -1,6 +1,5 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { ArrowLeft, Calendar, Save } from 'lucide-react-native';
-import { useState } from 'react';
+import { AlignLeft, ArrowLeft, Calendar, CheckCircle, Clock, Save } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -17,34 +16,27 @@ import { API_BASE_URL, auth } from '../../ApiConfig';
 
 export const TarefasFormScreen = ({ navigation }) => {
     const [titulo, setTitulo] = useState('');
-    const [date, setDate] = useState(new Date());
-    const [show, setShow] = useState(false);
-    const [mode, setMode] = useState('date');
-    const [tipo, setTipo] = useState('meeting'); // meeting, visit, content, event
     const [descricao, setDescricao] = useState('');
+    const [data, setData] = useState('');
+    const [time, setTime] = useState('');
+    const [tipo, setTipo] = useState('general');
     const [loading, setLoading] = useState(false);
 
-    const taskTypes = [
-        { id: 'meeting', label: 'Reunião' },
-        { id: 'visit', label: 'Visita' },
-        { id: 'content', label: 'Mídia' },
-        { id: 'event', label: 'Evento' },
-    ];
-
-    const onChangeAndroid = (event, selectedDate) => {
-        const currentDate = selectedDate || date;
-        setShow(false);
-        setDate(currentDate);
-    };
-
-    const showModeAndroid = (currentMode) => {
-        setShow(true);
-        setMode(currentMode);
-    };
+    useEffect(() => {
+        const now = new Date();
+        const d = String(now.getDate()).padStart(2, '0');
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const y = now.getFullYear();
+        const h = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        
+        setData(`${d}/${m}/${y}`);
+        setTime(`${h}:${min}`);
+    }, []);
 
     const handleSave = async () => {
-        if (!titulo) {
-            Alert.alert('Atenção', 'Por favor, preencha o título da tarefa.');
+        if (!titulo || !data || !time) {
+            Alert.alert('Erro', 'Por favor, preencha o título, data e hora.');
             return;
         }
 
@@ -57,77 +49,82 @@ export const TarefasFormScreen = ({ navigation }) => {
             }
             const token = await user.getIdToken();
 
-            // Buscar dados do usuário para verificar se é assessor e pegar o adminId
-            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-            const userData = await responseUser.json();
+            // Buscar dados do usuário para compor adminId e creatorName
+            const userResp = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
+            const userData = await userResp.json();
 
-            let adminId = user.uid; // Se for político, ele é o admin
-            if (userData && userData.tipoUser === 'assessor') {
-                adminId = userData.adminId || userData.creatorId;
+            const creatorName = userData?.nome || 'Usuário';
+            // Se o usuário tem adminId (é assessor), usa ele. Se não, usa o próprio UID (é o admin).
+            let adminId;
+            if (userData?.tipoUser === 'admin') {
+                 adminId = user.uid;
+            } else {
+                 adminId = userData?.adminId;
             }
+            
 
-            const payload = {
-                titulo,
-                data: date.toLocaleDateString('pt-BR'),
-                time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                fullDate: date.toISOString(),
-                tipo,
-                descricao,
-                status: 'pending',
-                creatorId: user.uid,
+            // Construção do fullDate para ordenação
+            const [day, month, year] = data.split('/');
+            const [hour, minute] = time.split(':');
+            // Nota: Mês em Date começa em 0
+            const isoDate = new Date(year, month - 1, day, hour, minute).toISOString();
+
+            const newTask = {
                 adminId: adminId,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                creatorEmail: user.email,
+                creatorId: user.uid,
+                creatorName: creatorName,
+                data: data,
+                descricao: descricao,
+                fullDate: isoDate,
+                status: "pending",
+                time: time,
+                tipo: tipo,
+                titulo: titulo,
+                updatedAt: new Date().toISOString()
             };
 
             await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(newTask)
             });
 
-            // Criar Notificação de Nova Tarefa
-            await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: 'Nova Tarefa',
-                    description: `Nova atividade "${titulo}" agendada para ${date.toLocaleDateString('pt-BR')}.`,
-                    type: 'task',
-                    read: false,
-                    createdAt: new Date().toISOString(),
-                    userId: user.uid,
-                    creatorId: user.uid,
-                    adminId: adminId,
-                    userEmail: user.email
-                })
-            });
-
-            Alert.alert('Sucesso', 'Tarefa agendada com sucesso!');
+            Alert.alert('Sucesso', 'Tarefa criada com sucesso!');
             navigation.goBack();
+
         } catch (error) {
-            console.error(error);
+            console.error('Erro ao salvar tarefa:', error);
             Alert.alert('Erro', 'Não foi possível salvar a tarefa.');
         } finally {
             setLoading(false);
         }
     };
 
+    const types = [
+        { id: 'general', label: 'Geral' },
+        { id: 'meeting', label: 'Reunião' },
+        { id: 'visit', label: 'Visita' },
+        { id: 'content', label: 'Mídia' },
+        { id: 'event', label: 'Evento' },
+    ];
+
     return (
         <View style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
-                                <Text style={styles.textGreen}>Nova</Text>
-                                <Text style={styles.textWhite}> Atividade</Text>
+                                <Text style={styles.textGreen}>Nova </Text>
+                                <Text style={styles.textWhite}>Tarefa</Text>
                             </Text>
                         </TouchableOpacity>
                     </View>
                     <View style={styles.iconBox}>
-                        <Calendar size={28} color="#6EE794" />
+                        <CheckCircle size={28} color="#6EE794" />
                     </View>
                 </View>
             </View>
@@ -142,100 +139,77 @@ export const TarefasFormScreen = ({ navigation }) => {
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.formCard}>
-                        <Text style={styles.sectionTitle}>Detalhes da Atividade</Text>
-
-                        <Text style={styles.label}>Título da Tarefa</Text>
+                        <Text style={styles.label}>Título</Text>
                         <TextInput
                             style={styles.input}
                             placeholder="Ex: Reunião com Lideranças"
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor="#94a3b8"
                             value={titulo}
                             onChangeText={setTitulo}
                         />
 
-                        <View style={styles.row}>
-                            <View style={{ flex: 1, marginRight: 8 }}>
-                                <Text style={styles.label}>Data</Text>
-                                {Platform.OS === 'android' ? (
-                                    <TouchableOpacity
-                                        style={[styles.input, { justifyContent: 'center' }]}
-                                        onPress={() => showModeAndroid('date')}
-                                    >
-                                        <Text style={{ fontSize: 16, color: colors.textDark }}>
-                                            {date.toLocaleDateString('pt-BR')}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ) : (
-                                    <View style={[styles.input, { justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 8 }]}>
-                                        <DateTimePicker
-                                            value={date}
-                                            mode="date"
-                                            display="default"
-                                            onChange={(e, d) => setDate(d || date)}
-                                        />
-                                    </View>
-                                )}
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.label}>Data (DD/MM/AAAA)</Text>
+                                <View style={styles.inputIconContainer}>
+                                    <Calendar size={20} color="#94a3b8" style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        style={styles.inputFlex}
+                                        placeholder="DD/MM/AAAA"
+                                        placeholderTextColor="#94a3b8"
+                                        value={data}
+                                        onChangeText={setData}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
                             </View>
-                            <View style={{ flex: 0.6, marginLeft: 8 }}>
-                                <Text style={styles.label}>Hora</Text>
-                                {Platform.OS === 'android' ? (
-                                    <TouchableOpacity
-                                        style={[styles.input, { justifyContent: 'center' }]}
-                                        onPress={() => showModeAndroid('time')}
-                                    >
-                                        <Text style={{ fontSize: 16, color: colors.textDark }}>
-                                            {date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ) : (
-                                    <View style={[styles.input, { justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 8 }]}>
-                                        <DateTimePicker
-                                            value={date}
-                                            mode="time"
-                                            display="default"
-                                            onChange={(e, d) => setDate(d || date)}
-                                        />
-                                    </View>
-                                )}
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.label}>Hora (HH:MM)</Text>
+                                <View style={styles.inputIconContainer}>
+                                    <Clock size={20} color="#94a3b8" style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        style={styles.inputFlex}
+                                        placeholder="HH:MM"
+                                        placeholderTextColor="#94a3b8"
+                                        value={time}
+                                        onChangeText={setTime}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
                             </View>
                         </View>
 
                         <Text style={styles.label}>Tipo de Atividade</Text>
-                        <View style={styles.typeContainer}>
-                            {taskTypes.map((t) => (
+                        <View style={styles.typesContainer}>
+                            {types.map((t) => (
                                 <TouchableOpacity
                                     key={t.id}
-                                    style={[styles.typeButton, tipo === t.id && styles.typeButtonActive]}
+                                    style={[
+                                        styles.typeButton,
+                                        tipo === t.id && styles.typeButtonActive
+                                    ]}
                                     onPress={() => setTipo(t.id)}
                                 >
-                                    <Text style={[styles.typeText, tipo === t.id && styles.typeTextActive]}>
-                                        {t.label}
-                                    </Text>
+                                    <Text style={[
+                                        styles.typeText,
+                                        tipo === t.id && styles.typeTextActive
+                                    ]}>{t.label}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
-                        {Platform.OS === 'android' && show && (
-                            <DateTimePicker
-                                testID="dateTimePicker"
-                                value={date}
-                                mode={mode}
-                                is24Hour={true}
-                                display="default"
-                                onChange={onChangeAndroid}
+                        <Text style={styles.label}>Descrição</Text>
+                        <View style={[styles.inputIconContainer, { alignItems: 'flex-start', height: 100, paddingVertical: 12 }]}>
+                            <AlignLeft size={20} color="#94a3b8" style={{ marginRight: 8, marginTop: 4 }} />
+                            <TextInput
+                                style={[styles.inputFlex, { height: '100%', textAlignVertical: 'top' }]}
+                                placeholder="Detalhes da tarefa..."
+                                placeholderTextColor="#94a3b8"
+                                value={descricao}
+                                onChangeText={setDescricao}
+                                multiline
                             />
-                        )}
-
-                        <Text style={styles.label}>Descrição / Observações</Text>
-                        <TextInput
-                            style={[styles.input, { height: 100, textAlignVertical: 'top', paddingTop: 12 }]}
-                            placeholder="Detalhes adicionais sobre a tarefa..."
-                            placeholderTextColor="#64748b"
-                            multiline
-                            numberOfLines={4}
-                            value={descricao}
-                            onChangeText={setDescricao}
-                        />
+                        </View>
 
                         <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
                             {loading ? (
@@ -243,7 +217,7 @@ export const TarefasFormScreen = ({ navigation }) => {
                             ) : (
                                 <>
                                     <Save size={20} color="white" style={{ marginRight: 8 }} />
-                                    <Text style={styles.buttonText}>Agendar Tarefa</Text>
+                                    <Text style={styles.buttonText}>Salvar Tarefa</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -295,23 +269,25 @@ const styles = StyleSheet.create({
     logoText: { fontSize: 25, fontWeight: 'bold' },
     textGreen: { color: colors.primaryGreen, fontWeight: 'bold' },
     textWhite: { color: colors.white },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textDark, marginBottom: 16, marginTop: 8 },
-    label: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
+    label: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8, marginTop: 16 },
     input: {
-        height: 55, backgroundColor: colors.inputBackground, borderRadius: 12, paddingHorizontal: 16, marginBottom: 16, fontSize: 16, color: colors.textDark, borderWidth: 1, borderColor: '#e2e8f0',
+        height: 55, backgroundColor: colors.inputBackground, borderRadius: 12, paddingHorizontal: 16, fontSize: 16, color: colors.textDark, borderWidth: 1, borderColor: '#e2e8f0',
     },
-    row: { flexDirection: 'row', justifyContent: 'space-between' },
-    typeContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    inputIconContainer: {
+        flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBackground, borderRadius: 12, paddingHorizontal: 16, height: 55, borderWidth: 1, borderColor: '#e2e8f0',
+    },
+    inputFlex: { flex: 1, fontSize: 16, color: colors.textDark },
+    typesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     typeButton: {
-        paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0',
+        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0',
     },
     typeButtonActive: {
-        backgroundColor: '#dcfce7', borderColor: colors.primaryGreen,
+        backgroundColor: '#dbeafe', borderColor: '#3b82f6',
     },
-    typeText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-    typeTextActive: { color: '#166534' },
+    typeText: { fontSize: 14, color: '#64748b', fontWeight: '500' },
+    typeTextActive: { color: '#2563eb', fontWeight: 'bold' },
     button: {
-        height: 56, backgroundColor: colors.primaryGreen, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24, shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+        height: 56, backgroundColor: colors.primaryGreen, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 32, shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
     },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },
 });
