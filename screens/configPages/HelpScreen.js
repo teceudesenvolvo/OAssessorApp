@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, HelpCircle, Mail } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, HelpCircle } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export const HelpScreen = ({ navigation }) => {
@@ -45,7 +45,7 @@ export const HelpScreen = ({ navigation }) => {
                     ))}
                 </View>
 
-                <View style={styles.card}>
+                {/* <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Ainda precisa de ajuda?</Text>
                     <Text style={styles.supportText}>Entre em contato com nossa equipe de suporte técnico.</Text>
                     
@@ -53,7 +53,7 @@ export const HelpScreen = ({ navigation }) => {
                         <Mail size={20} color="white" style={{ marginRight: 8 }} />
                         <Text style={styles.buttonText}>Fale Conosco</Text>
                     </TouchableOpacity>
-                </View>
+                </View> */}
             </ScrollView>
         </View>
     );

@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import * as Notifications from 'expo-notifications';
 import { signOut } from 'firebase/auth';
-import { ChevronRight, HelpCircle, LogOut, Radio, Shield, UserCog } from 'lucide-react-native';
+import { ChevronRight, HelpCircle, LogOut, Shield, UserCog } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
@@ -25,8 +25,23 @@ export const PerfilScreen = ({ navigation }) => {
 
         try {
             const token = await user.getIdToken();
-            const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-            const data = await response.json();
+            // Tenta buscar diretamente pelo UID
+            let response = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
+            let data = await response.json();
+
+            // Se não encontrar (null), busca na coleção inteira filtrando por userId ou email
+            if (!data) {
+                const usersResponse = await fetch(`${API_BASE_URL}/users.json?auth=${token}`);
+                const usersData = await usersResponse.json();
+                if (usersData) {
+                    const foundUser = Object.values(usersData).find(u => 
+                        (u.userId && u.userId === user.uid) || 
+                        (u.email && u.email === user.email)
+                    );
+                    if (foundUser) data = foundUser;
+                }
+            }
+            
             setUserData(data);
         } catch (error) {
             console.error('Erro ao buscar perfil:', error);
@@ -195,7 +210,7 @@ export const PerfilScreen = ({ navigation }) => {
 
                             
 
-                            <TouchableOpacity 
+                            {/* <TouchableOpacity 
                                 style={styles.menuItem} 
                                 onPress={handleRealPushTest}
                             >
@@ -206,7 +221,7 @@ export const PerfilScreen = ({ navigation }) => {
                                     <Text style={styles.menuItemText}>Testar Push (Via Banco)</Text>
                                 </View>
                                 <ChevronRight size={20} color="#cbd5e1" />
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
 
                             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                                 <LogOut size={20} color="#ef4444" />
