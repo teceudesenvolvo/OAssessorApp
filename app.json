@@ -1,22 +1,22 @@
 {
   "expo": {
     "name": "O Assessor",
-    "slug": "oassessor-blu",
+    "slug": "oassessor-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "resizeMode": "contain", 
+      "backgroundColor": "#101422"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.blutecnologias.oassessor",
+      "bundleIdentifier": "com.lavoroservicos.oassessor",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,7 +24,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#101422"
       },
       "package": "com.blutecnologias.oassessor"
     },
