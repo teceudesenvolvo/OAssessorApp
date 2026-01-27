@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/images/splash.png",
-      "resizeMode": "contain", 
+      "resizeMode": "contain",
       "backgroundColor": "#101422"
     },
     "assetBundlePatterns": [
@@ -26,7 +26,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#101422"
       },
-      "package": "com.blutecnologias.oassessor"
+      "package": "com.blutecnologias.oassessor",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -37,7 +38,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "8be6cd40-ccd9-4831-ab49-5f40218c6448"
+        "projectId": "946ff14e-fdd0-447c-97d7-69ae4dd7b307"
       }
     }
   }
