@@ -23,6 +23,7 @@ exports.sendInviteEmail = onRequest({ cors: true, invoker: 'public' }, async (re
     }
 
     const { email, nome } = req.body;
+    console.log("Solicitação de convite recebida. Dados:", { email, nome, body: req.body });
 
     if (!email || !nome) {
       return res.status(400).send("Faltando email ou nome");
@@ -49,6 +50,10 @@ exports.sendInviteEmail = onRequest({ cors: true, invoker: 'public' }, async (re
       res.status(200).send({ success: true });
     } catch (error) {
       console.error("Erro ao enviar email:", error);
+      // Diagnóstico para Plano Spark (bloqueio de porta SMTP)
+      if (error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN' || error.message.includes('network') || error.code === 'ETIMEDOUT') {
+        console.error("ALERTA CRÍTICO: Erro de rede. Se estiver no plano 'Spark' (gratuito), conexões SMTP externas podem ser bloqueadas. Considere upgrade para 'Blaze'.");
+      }
       res.status(500).send({ error: error.toString() });
     }
 });

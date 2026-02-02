@@ -102,6 +102,8 @@ function DashboardTabs({ route, navigation }) {
     return () => clearTimeout(timer); // Limpa o timer se o componente for desmontado
   }, []);
 
+  const isTablet = Device.deviceType === Device.DeviceType.TABLET;
+
   const { role } = route.params || { role: 'POLITICO' };
   
   let MainScreen;
@@ -116,7 +118,7 @@ function DashboardTabs({ route, navigation }) {
         tabBarStyle: [ // Convertido para array para aceitar estilos animados
           {
             position: 'absolute',
-            bottom: 0, // Define a posição base fixa
+            bottom: isTablet ? 50 : 0, // Aumentado para 50 para garantir que fique acima da navbar do Android
             left: 10,
             right: 10,
             backgroundColor: 'rgba(255, 255, 255, 1)',

@@ -215,19 +215,19 @@ export const EleitorCadastroScreen = ({ navigation }) => {
                 )}
             </ScrollView>
 
-            <TouchableOpacity style={[styles.fab, { bottom: 250, backgroundColor: 'white' }]} onPress={handleExportPDF}>
+            <TouchableOpacity style={[styles.fab, { bottom: 250, backgroundColor: 'white', marginBottom: 30 }]} onPress={handleExportPDF}>
                 <View pointerEvents="none">
                     <FileText size={24} color="#6EE794" />
                 </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white' }]} onPress={handleShareFormLink}>
+            <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white', marginBottom: 30 }]} onPress={handleShareFormLink}>
                 <View pointerEvents="none">
                     <Link size={24} color="#6EE794" />
                 </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('EleitorForm')}>
+            <TouchableOpacity style={[styles.fab, {marginBottom: 30}]} onPress={() => navigation.navigate('EleitorForm')}>
                 <View pointerEvents="none">
                     <Plus size={24} color="white" />
                 </View>

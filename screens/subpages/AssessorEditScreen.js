@@ -4,6 +4,7 @@ import {
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -12,7 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL } from '../../ApiConfig';
+import { API_BASE_URL, auth, CLOUD_FUNCTION_URL } from '../../ApiConfig';
 
 // Funções de Máscara
 const maskCPF = (value) => {
@@ -42,6 +43,44 @@ export const AssessorEditScreen = ({ navigation, route }) => {
     const [email, setEmail] = useState(assessor.email || '');
     const [telefone, setTelefone] = useState(assessor.telefone || '');
 
+    const isConvidado = assessor.status === 'Convidado';
+
+    const sendInviteEmail = async (name, emailAddress) => {
+        try {
+            const response = await fetch(CLOUD_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: emailAddress,
+                    nome: name
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Falha no envio (${response.status}): ${errorText}`);
+            }
+        } catch (error) {
+            console.log('Erro ao enviar email via Cloud Function:', error);
+            Alert.alert(
+                'Erro no Envio',
+                `Houve uma falha ao tentar enviar o email automaticamente.\n\nErro: ${error.message}\n\nDeseja abrir o app de email manualmente?`,
+                [
+                    { text: 'Não', style: 'cancel' },
+                    { 
+                        text: 'Sim', 
+                        onPress: () => {
+                            const subject = "Convite para O Assessor";
+                            const body = `Olá ${name},\n\nVocê foi convidado para fazer parte da equipe no aplicativo O Assessor.\n\nPara concluir seu cadastro, clique no link abaixo:\n\nhttps://oassessor-app.com/cadastro?email=${emailAddress}\n\nAtenciosamente,\nEquipe O Assessor`;
+                            const url = `mailto:${emailAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                            Linking.openURL(url).catch(() => Alert.alert('Erro', 'Não foi possível abrir o aplicativo de email.'));
+                        }
+                    }
+                ]
+            );
+        }
+    };
+
     const handleUpdate = async () => {
         if (!nome || !email) {
             Alert.alert('Atenção', 'Por favor, preencha os campos obrigatórios (Nome e Email).');
@@ -50,6 +89,9 @@ export const AssessorEditScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
+            const user = auth.currentUser;
+            const token = user ? await user.getIdToken() : '';
+
             const payload = {
                 nome,
                 cargo,
@@ -60,20 +102,25 @@ export const AssessorEditScreen = ({ navigation, route }) => {
             };
 
             // Atualiza na coleção de assessores
-            await fetch(`${API_BASE_URL}/assessores/${assessor.id}.json`, {
+            await fetch(`${API_BASE_URL}/assessores/${assessor.id}.json?auth=${token}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
             // Atualiza na coleção de users (se o ID for o mesmo)
-            await fetch(`${API_BASE_URL}/users/${assessor.id}.json`, {
+            await fetch(`${API_BASE_URL}/users/${assessor.id}.json?auth=${token}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
-            Alert.alert('Sucesso', 'Dados do assessor atualizados!');
+            if (isConvidado && email !== assessor.email) {
+                await sendInviteEmail(nome, email);
+                Alert.alert('Sucesso', 'Dados atualizados e novo convite enviado!');
+            } else {
+                Alert.alert('Sucesso', 'Dados do assessor atualizados!');
+            }
             navigation.goBack();
         } catch (error) {
             console.error(error);
@@ -94,10 +141,14 @@ export const AssessorEditScreen = ({ navigation, route }) => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await fetch(`${API_BASE_URL}/assessores/${assessor.id}.json`, { method: 'DELETE' });
-                            await fetch(`${API_BASE_URL}/users/${assessor.id}.json`, { method: 'DELETE' });
+                            const user = auth.currentUser;
+                            const token = user ? await user.getIdToken() : '';
+
+                            await fetch(`${API_BASE_URL}/assessores/${assessor.id}.json?auth=${token}`, { method: 'DELETE' });
+                            await fetch(`${API_BASE_URL}/users/${assessor.id}.json?auth=${token}`, { method: 'DELETE' });
                             navigation.goBack();
                         } catch (error) {
+                            console.error(error);
                             Alert.alert('Erro', 'Não foi possível excluir o assessor.');
                         }
                     }
@@ -143,7 +194,7 @@ export const AssessorEditScreen = ({ navigation, route }) => {
                         <TextInput style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]} placeholder="Ex: (11) 99999-9999" placeholderTextColor="#64748b" keyboardType="phone-pad" maxLength={15} value={telefone} editable={false} />
 
                         <Text style={styles.label}>Email</Text>
-                        <TextInput style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]} placeholder="Ex: roberto@equipe.com" placeholderTextColor="#64748b" keyboardType="email-address" autoCapitalize="none" value={email} editable={false} />
+                        <TextInput style={[styles.input, !isConvidado && { backgroundColor: '#e2e8f0', color: '#94a3b8' }]} placeholder="Ex: roberto@equipe.com" placeholderTextColor="#64748b" keyboardType="email-address" autoCapitalize="none" value={email} editable={isConvidado} onChangeText={setEmail} />
 
                         <TouchableOpacity style={styles.button} onPress={handleUpdate} disabled={loading}>
                             {loading ? (

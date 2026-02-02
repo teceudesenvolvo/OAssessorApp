@@ -57,7 +57,7 @@ export const AssessorFormScreen = ({ navigation }) => {
                 throw new Error(`Falha no envio (${response.status}): ${errorText}`);
             }
 
-            Alert.alert('Enviado', 'O convite foi enviado por email com sucesso.');
+            // Alert.alert('Enviado', 'O convite foi enviado por email com sucesso.'); // Removido para centralizar o feedback no final do cadastro
         } catch (error) {
             console.log('Erro ao enviar email via Cloud Function:', error);
             Alert.alert(
@@ -100,6 +100,7 @@ export const AssessorFormScreen = ({ navigation }) => {
             creatorId,
             adminId,
             createdAt: new Date().toISOString(),
+            status: "Convidado",
         };
 
         try {
@@ -117,6 +118,12 @@ export const AssessorFormScreen = ({ navigation }) => {
             if (!response.ok) throw new Error('Erro ao salvar');
 
             const data = await response.json();
+
+            // Envia o convite por email
+            await sendInviteEmail(nome, email);
+
+            Alert.alert('Sucesso', 'Assessor cadastrado e convite enviado!');
+            navigation.goBack();
         } catch (error) {
             Alert.alert('Erro', 'Não foi possível cadastrar o assessor. Verifique sua conexão.');
             console.error(error);

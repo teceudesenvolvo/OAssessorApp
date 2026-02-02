@@ -197,7 +197,7 @@ export const TarefasScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* FAB Add Button */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('TarefasForm')}>
+      <TouchableOpacity style={[styles.fab, {marginBottom: 40}]} onPress={() => navigation.navigate('TarefasForm')}>
         <View pointerEvents="none">
             <Plus size={24} color="white" />
         </View>

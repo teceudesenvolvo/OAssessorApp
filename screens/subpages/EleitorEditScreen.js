@@ -1,18 +1,20 @@
-import { ArrowLeft, ArrowRight, Save, UserCog } from 'lucide-react-native';
-import { useState } from 'react';
+import { ArrowLeft, ArrowRight, ChevronDown, Save, UserCog } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    FlatList,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
-import { API_BASE_URL } from '../../ApiConfig';
+import { API_BASE_URL, auth } from '../../ApiConfig';
 
 // Funções de Máscara
 const maskCPF = (value) => {
@@ -47,23 +49,6 @@ const maskCEP = (value) => {
         .replace(/(-\d{3})\d+?$/, '$1');
 };
 
-const maskTitulo = (value) => {
-    return value
-        .replace(/\D/g, '')
-        .replace(/(\d{4})(\d)/, '$1 $2')
-        .replace(/(\d{4})(\d)/, '$1 $2')
-        .replace(/(\d{4})\d+?$/, '$1');
-};
-
-const maskZonaSecao = (value) => {
-    let v = value.replace(/\D/g, '');
-    if (v.length > 7) v = v.slice(0, 7);
-    if (v.length > 3) {
-        return v.replace(/^(\d{3})(\d)/, '$1 / $2');
-    }
-    return v;
-};
-
 export const EleitorEditScreen = ({ navigation, route }) => {
     const { eleitor } = route.params;
     const [step, setStep] = useState(1);
@@ -75,6 +60,7 @@ export const EleitorEditScreen = ({ navigation, route }) => {
     const [nascimento, setNascimento] = useState(eleitor.nascimento || '');
     const [email, setEmail] = useState(eleitor.email || '');
     const [telefone, setTelefone] = useState(eleitor.telefone || '');
+    const [sexo, setSexo] = useState(eleitor.sexo || '');
 
     const [cep, setCep] = useState(eleitor.cep || '');
     const [endereco, setEndereco] = useState(eleitor.endereco || '');
@@ -83,7 +69,31 @@ export const EleitorEditScreen = ({ navigation, route }) => {
     const [cidade, setCidade] = useState(eleitor.cidade || '');
     const [estado, setEstado] = useState(eleitor.estado || '');
     const [titulo, setTitulo] = useState(eleitor.titulo || '');
-    const [zonaSecao, setZonaSecao] = useState(eleitor.zonaSecao || '');
+    const [zona, setZona] = useState(eleitor.zona || (eleitor.zonaSecao ? eleitor.zonaSecao.split(' / ')[0] : ''));
+    const [secao, setSecao] = useState(eleitor.secao || (eleitor.zonaSecao ? eleitor.zonaSecao.split(' / ')[1] : ''));
+    const [localVotacao, setLocalVotacao] = useState(eleitor.localVotacao || '');
+
+    const [locaisList, setLocaisList] = useState([]);
+    const [filteredLocais, setFilteredLocais] = useState([]);
+    const [showSexoPicker, setShowSexoPicker] = useState(false);
+    const [showLocalPicker, setShowLocalPicker] = useState(false);
+
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/localvotacao.json`)
+            .then(res => res.json())
+            .then(data => {
+                const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+                setLocaisList(list);
+            })
+            .catch(err => console.log('Erro ao buscar locais:', err));
+    }, []);
+
+    useEffect(() => {
+        if (zona && locaisList.length > 0) {
+            const filtered = locaisList.filter(l => String(l.zona) === String(zona));
+            setFilteredLocais(filtered);
+        }
+    }, [zona, locaisList]);
 
     const handleCepChange = async (text) => {
         const maskedCep = maskCEP(text);
@@ -115,25 +125,36 @@ export const EleitorEditScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
+            const user = auth.currentUser;
+            const token = user ? await user.getIdToken() : '';
+            const creatorEmail = user?.email || '';
+
             const payload = {
                 nome,
                 cpf,
                 nascimento,
                 email,
                 telefone,
+                sexo,
                 cep,
                 endereco,
                 numero,
                 bairro,
                 cidade,
                 estado,
+                lat: eleitor.lat || '',
+                lng: eleitor.lng || '',
                 titulo,
-                zonaSecao,
-                updatedAt: new Date().toISOString()
+                zona,
+                secao,
+                zonaSecao: `${zona} / ${secao}`,
+                localVotacao,
+                updatedAt: new Date().toISOString(),
+                creatorEmail: creatorEmail // Atualiza com o email do usuário logado conforme solicitado
             };
 
             // Usa PATCH para atualizar apenas os campos enviados, mantendo creatorId e createdAt originais
-            const response = await fetch(`${API_BASE_URL}/eleitores/${eleitor.id}.json`, {
+            const response = await fetch(`${API_BASE_URL}/eleitores/${eleitor.id}.json?auth=${token}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -196,6 +217,14 @@ export const EleitorEditScreen = ({ navigation, route }) => {
                                 <Text style={styles.label}>Email</Text>
                                 <TextInput style={styles.input} placeholder="Ex: joao@email.com" placeholderTextColor="#64748b" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
 
+                                <Text style={styles.label}>Sexo</Text>
+                                <TouchableOpacity style={styles.selectButton} onPress={() => setShowSexoPicker(true)}>
+                                    <Text style={{ color: sexo ? colors.textDark : '#64748b', fontSize: 16 }}>
+                                        {sexo || 'Selecione o sexo'}
+                                    </Text>
+                                    <ChevronDown size={20} color="#64748b" />
+                                </TouchableOpacity>
+
                                 <TouchableOpacity style={styles.button} onPress={() => setStep(2)}>
                                     <Text style={styles.buttonText}>Próximo</Text>
                                     <ArrowRight size={20} color="white" style={{ marginLeft: 8 }} />
@@ -241,8 +270,44 @@ export const EleitorEditScreen = ({ navigation, route }) => {
                                 <Text style={styles.label}>Título de Eleitor</Text>
                                 <TextInput style={styles.input} placeholder="0000 0000 0000" placeholderTextColor="#64748b" keyboardType="numeric" maxLength={14} value={titulo} onChangeText={(text) => setTitulo(maskTitulo(text))} />
 
-                                <Text style={styles.label}>Zona / Seção</Text>
-                                <TextInput style={styles.input} placeholder="Ex: 054 / 0123" placeholderTextColor="#64748b" keyboardType="numeric" maxLength={10} value={zonaSecao} onChangeText={(text) => setZonaSecao(maskZonaSecao(text))} />
+                                <View style={styles.row}>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <Text style={styles.label}>Zona</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="000"
+                                            placeholderTextColor="#64748b"
+                                            keyboardType="numeric"
+                                            maxLength={4}
+                                            value={zona}
+                                            onChangeText={setZona}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 8 }}>
+                                        <Text style={styles.label}>Seção</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="0000"
+                                            placeholderTextColor="#64748b"
+                                            keyboardType="numeric"
+                                            maxLength={4}
+                                            value={secao}
+                                            onChangeText={setSecao}
+                                        />
+                                    </View>
+                                </View>
+
+                                <Text style={styles.label}>Local de Votação</Text>
+                                <TouchableOpacity 
+                                    style={[styles.selectButton, { opacity: zona ? 1 : 0.5 }]} 
+                                    onPress={() => zona && setShowLocalPicker(true)}
+                                    disabled={!zona}
+                                >
+                                    <Text style={{ color: localVotacao ? colors.textDark : '#64748b', fontSize: 16, flex: 1 }} numberOfLines={1}>
+                                        {localVotacao || (zona ? 'Selecione o local' : 'Preencha a Zona primeiro')}
+                                    </Text>
+                                    <ChevronDown size={20} color="#64748b" />
+                                </TouchableOpacity>
 
                                 <View style={styles.buttonRow}>
                                     <TouchableOpacity style={styles.backButton} onPress={() => setStep(1)}>
@@ -265,7 +330,55 @@ export const EleitorEditScreen = ({ navigation, route }) => {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Modal Sexo */}
+            <SimplePicker 
+                visible={showSexoPicker}
+                title="Selecione o Sexo"
+                options={['Masculino', 'Feminino', 'Outro', 'Prefiro não informar']}
+                onSelect={setSexo}
+                onClose={() => setShowSexoPicker(false)}
+            />
+
+            {/* Modal Local de Votação */}
+            <SimplePicker 
+                visible={showLocalPicker}
+                title={`Locais na Zona ${zona}`}
+                options={filteredLocais}
+                displayKey="local"
+                onSelect={(item) => setLocalVotacao(item.local || item.nome || item.descricao || item)}
+                onClose={() => setShowLocalPicker(false)}
+            />
         </View>
+    );
+};
+
+const SimplePicker = ({ visible, options, onSelect, onClose, title, displayKey }) => {
+    if (!visible) return null;
+    return (
+        <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+            <TouchableOpacity style={{flex:1, backgroundColor:'rgba(0,0,0,0.5)', justifyContent:'center', padding: 20}} onPress={onClose}>
+                <View style={{backgroundColor:'white', borderRadius:10, maxHeight:'80%'}}>
+                    <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:15, borderBottomWidth:1, borderColor:'#eee'}}>
+                        <Text style={{fontWeight:'bold', fontSize:16}}>{title}</Text>
+                        <TouchableOpacity onPress={onClose}><Text style={{color:'#ef4444'}}>Fechar</Text></TouchableOpacity>
+                    </View>
+                    {options.length === 0 ? (
+                        <Text style={{padding:20, textAlign:'center', color:'#64748b'}}>Nenhum local encontrado para esta zona.</Text>
+                    ) : (
+                        <FlatList
+                            data={options}
+                            keyExtractor={(item, i) => i.toString()}
+                            renderItem={({item}) => (
+                                <TouchableOpacity style={{padding:15, borderBottomWidth:1, borderColor:'#f0f0f0'}} onPress={() => { onSelect(item); onClose(); }}>
+                                    <Text style={{fontSize:16, color:'#334155'}}>{displayKey ? (item[displayKey] || JSON.stringify(item)) : item}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    )}
+                </View>
+            </TouchableOpacity>
+        </Modal>
     );
 };
 
@@ -313,6 +426,9 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textDark, marginBottom: 16, marginTop: 8 },
     label: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
     input: { height: 55, backgroundColor: colors.inputBackground, borderRadius: 12, paddingHorizontal: 16, marginBottom: 16, fontSize: 16, color: colors.textDark, borderWidth: 1, borderColor: '#e2e8f0' },
+    selectButton: {
+        height: 55, backgroundColor: colors.inputBackground, borderRadius: 12, paddingHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
+    },
     row: { flexDirection: 'row', justifyContent: 'space-between' },
     button: { height: 56, backgroundColor: colors.primaryGreen, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24, shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },

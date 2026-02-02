@@ -1,16 +1,18 @@
-import { ArrowLeft, ArrowRight, Save, UserPlus } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { ArrowLeft, ArrowRight, ChevronDown, Save, UserPlus } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    FlatList,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { API_BASE_URL, auth } from '../../ApiConfig';
 
@@ -47,23 +49,6 @@ const maskCEP = (value) => {
         .replace(/(-\d{3})\d+?$/, '$1');
 };
 
-const maskTitulo = (value) => {
-    return value
-        .replace(/\D/g, '')
-        .replace(/(\d{4})(\d)/, '$1 $2')
-        .replace(/(\d{4})(\d)/, '$1 $2')
-        .replace(/(\d{4})\d+?$/, '$1');
-};
-
-const maskZonaSecao = (value) => {
-    let v = value.replace(/\D/g, '');
-    if (v.length > 7) v = v.slice(0, 7);
-    if (v.length > 3) {
-        return v.replace(/^(\d{3})(\d)/, '$1 / $2');
-    }
-    return v;
-};
-
 export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
     const [step, setStep] = useState(1);
 
@@ -73,6 +58,7 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
     const [nascimento, setNascimento] = useState('');
     const [email, setEmail] = useState('');
     const [telefone, setTelefone] = useState('');
+    const [sexo, setSexo] = useState('');
 
     // Etapa 2: Endereço e Dados Eleitorais
     const [cep, setCep] = useState('');
@@ -82,8 +68,34 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
     const [cidade, setCidade] = useState('');
     const [estado, setEstado] = useState('');
     const [titulo, setTitulo] = useState('');
-    const [zonaSecao, setZonaSecao] = useState('');
+    const [zona, setZona] = useState('');
+    const [secao, setSecao] = useState('');
+    const [localVotacao, setLocalVotacao] = useState('');
+    
     const [loading, setLoading] = useState(false);
+    const [locaisList, setLocaisList] = useState([]);
+    const [filteredLocais, setFilteredLocais] = useState([]);
+    
+    // Modais
+    const [showSexoPicker, setShowSexoPicker] = useState(false);
+    const [showLocalPicker, setShowLocalPicker] = useState(false);
+
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/localvotacao.json`)
+            .then(res => res.json())
+            .then(data => {
+                const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+                setLocaisList(list);
+            })
+            .catch(err => console.log('Erro ao buscar locais de votação:', err));
+    }, []);
+
+    useEffect(() => {
+        if (zona && locaisList.length > 0) {
+            const filtered = locaisList.filter(l => String(l.zona) === String(zona));
+            setFilteredLocais(filtered);
+        }
+    }, [zona, locaisList]);
 
     const handleCepChange = async (text) => {
         const maskedCep = maskCEP(text);
@@ -118,6 +130,7 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
         const creatorId = auth.currentUser?.uid;
         const user = auth.currentUser;
         const token = user ? await user.getIdToken() : '';
+        const creatorEmail = user?.email || '';
 
         try {
             const payload = {
@@ -126,17 +139,25 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
                 nascimento,
                 email,
                 telefone,
+                sexo,
                 cep,
                 endereco,
                 numero,
                 bairro,
                 cidade,
                 estado,
+                lat: '',
+                lng: '',
                 titulo,
-                zonaSecao,
+                zona,
+                secao,
+                zonaSecao: `${zona} / ${secao}`,
+                localVotacao,
                 createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 tipoUser: 'cidadao',
-                creatorId
+                creatorId,
+                creatorEmail
             };
 
             // Buscar dados do usuário para obter adminId
@@ -272,6 +293,14 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
                                     onChangeText={setEmail}
                                 />
 
+                                <Text style={styles.label}>Sexo</Text>
+                                <TouchableOpacity style={styles.selectButton} onPress={() => setShowSexoPicker(true)}>
+                                    <Text style={{ color: sexo ? colors.textDark : '#64748b', fontSize: 16 }}>
+                                        {sexo || 'Selecione o sexo'}
+                                    </Text>
+                                    <ChevronDown size={20} color="#64748b" />
+                                </TouchableOpacity>
+
                                 <TouchableOpacity style={styles.button} onPress={() => setStep(2)}>
                                     <Text style={styles.buttonText}>Próximo</Text>
                                     <ArrowRight size={20} color="white" style={{ marginLeft: 8 }} />
@@ -363,19 +392,47 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
                                     keyboardType="numeric"
                                     maxLength={14}
                                     value={titulo}
-                                    onChangeText={(text) => setTitulo(maskTitulo(text))}
+                                    onChangeText={setTitulo}
                                 />
 
-                                <Text style={styles.label}>Zona / Seção</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Ex: 054 / 0123"
-                                    placeholderTextColor="#64748b"
-                                    keyboardType="numeric"
-                                    maxLength={10}
-                                    value={zonaSecao}
-                                    onChangeText={(text) => setZonaSecao(maskZonaSecao(text))}
-                                />
+                                <View style={styles.row}>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <Text style={styles.label}>Zona</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="000"
+                                            placeholderTextColor="#64748b"
+                                            keyboardType="numeric"
+                                            maxLength={4}
+                                            value={zona}
+                                            onChangeText={setZona}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 8 }}>
+                                        <Text style={styles.label}>Seção</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="0000"
+                                            placeholderTextColor="#64748b"
+                                            keyboardType="numeric"
+                                            maxLength={4}
+                                            value={secao}
+                                            onChangeText={setSecao}
+                                        />
+                                    </View>
+                                </View>
+
+                                <Text style={styles.label}>Local de Votação</Text>
+                                <TouchableOpacity 
+                                    style={[styles.selectButton, { opacity: zona ? 1 : 0.5 }]} 
+                                    onPress={() => zona && setShowLocalPicker(true)}
+                                    disabled={!zona}
+                                >
+                                    <Text style={{ color: localVotacao ? colors.textDark : '#64748b', fontSize: 16, flex: 1 }} numberOfLines={1}>
+                                        {localVotacao || (zona ? 'Selecione o local' : 'Preencha a Zona primeiro')}
+                                    </Text>
+                                    <ChevronDown size={20} color="#64748b" />
+                                </TouchableOpacity>
 
                                 <View style={styles.buttonRow}>
                                     <TouchableOpacity style={styles.backButton} onPress={() => setStep(1)}>
@@ -398,7 +455,55 @@ export const EleitorFormScreen = ({ navigation, onBack, onSave }) => {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Modal Sexo */}
+            <SimplePicker 
+                visible={showSexoPicker}
+                title="Selecione o Sexo"
+                options={['Masculino', 'Feminino', 'Outro', 'Prefiro não informar']}
+                onSelect={setSexo}
+                onClose={() => setShowSexoPicker(false)}
+            />
+
+            {/* Modal Local de Votação */}
+            <SimplePicker 
+                visible={showLocalPicker}
+                title={`Locais na Zona ${zona}`}
+                options={filteredLocais}
+                displayKey="local" // Ajuste conforme a chave do JSON (ex: 'nome', 'local', 'descricao')
+                onSelect={(item) => setLocalVotacao(item.local || item.nome || item.descricao || item)}
+                onClose={() => setShowLocalPicker(false)}
+            />
         </View>
+    );
+};
+
+const SimplePicker = ({ visible, options, onSelect, onClose, title, displayKey }) => {
+    if (!visible) return null;
+    return (
+        <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+            <TouchableOpacity style={{flex:1, backgroundColor:'rgba(0,0,0,0.5)', justifyContent:'center', padding: 20}} onPress={onClose}>
+                <View style={{backgroundColor:'white', borderRadius:10, maxHeight:'80%'}}>
+                    <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:15, borderBottomWidth:1, borderColor:'#eee'}}>
+                        <Text style={{fontWeight:'bold', fontSize:16}}>{title}</Text>
+                        <TouchableOpacity onPress={onClose}><Text style={{color:'#ef4444'}}>Fechar</Text></TouchableOpacity>
+                    </View>
+                    {options.length === 0 ? (
+                        <Text style={{padding:20, textAlign:'center', color:'#64748b'}}>Nenhum local encontrado para esta zona.</Text>
+                    ) : (
+                        <FlatList
+                            data={options}
+                            keyExtractor={(item, i) => i.toString()}
+                            renderItem={({item}) => (
+                                <TouchableOpacity style={{padding:15, borderBottomWidth:1, borderColor:'#f0f0f0'}} onPress={() => { onSelect(item); onClose(); }}>
+                                    <Text style={{fontSize:16, color:'#334155'}}>{displayKey ? (item[displayKey] || JSON.stringify(item)) : item}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    )}
+                </View>
+            </TouchableOpacity>
+        </Modal>
     );
 };
 
@@ -456,6 +561,9 @@ const styles = StyleSheet.create({
     label: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
     input: {
         height: 55, backgroundColor: colors.inputBackground, borderRadius: 12, paddingHorizontal: 16, marginBottom: 16, fontSize: 16, color: colors.textDark, borderWidth: 1, borderColor: '#e2e8f0',
+    },
+    selectButton: {
+        height: 55, backgroundColor: colors.inputBackground, borderRadius: 12, paddingHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
     },
     row: { flexDirection: 'row', justifyContent: 'space-between' },
     button: {
