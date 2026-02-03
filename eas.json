@@ -20,7 +20,10 @@
         "appleId": "leonarrdoribeiro@icloud.com",
         "ascAppId": "6758312783",
         "appleTeamId": "KLZVFDM4KH"
-
+      },
+      "android": {
+        "serviceAccountKeyPath": "./api-0000000000000000000-111111-aaaaaabbbbbb.json",
+        "track": "internal"
       }
     }
   }
