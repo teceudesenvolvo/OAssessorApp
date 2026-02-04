@@ -34,7 +34,13 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Assessor utiliza sua localização para exibir tarefas e eleitores próximos no mapa e para validar sua presença durante as visitas."
+        }
+      ]
     ],
     "extra": {
       "router": {},
