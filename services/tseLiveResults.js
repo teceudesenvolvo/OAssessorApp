@@ -28,7 +28,7 @@ function parseRows(data, code) {
   })).filter(item => item.name).sort((a, b) => b.votes - a.votes);
 }
 
-export async function fetchTseLiveResults({ year, turn, uf, cargo, municipalityCode = '' }) {
+export async function fetchTseLiveResults({ year, turn, uf, cargo, municipalityCode = '', includeMunicipalities = false }) {
   const code = CARGO_CODES[cargo];
   if (!code) throw new Error('Cargo não disponível para esta eleição.');
   const president = cargo === 'Presidente';
@@ -52,7 +52,7 @@ export async function fetchTseLiveResults({ year, turn, uf, cargo, municipalityC
 
   let selectedMunicipality = municipalityCode;
   let municipalities = [];
-  if (municipal) {
+  if (municipal || includeMunicipalities) {
     const padded = String(election.cd).padStart(6, '0');
     const response = await fetch(fresh(`${cycleBase(election.cycle)}/${election.cd}/config/mun-e${padded}-cm.json`));
     if (!response.ok) throw new Error(`Lista de municípios do TSE indisponível (HTTP ${response.status}).`);
@@ -60,9 +60,11 @@ export async function fetchTseLiveResults({ year, turn, uf, cargo, municipalityC
     const area = (data?.abr || []).find(item => String(item.cd || item.cdabr || item.nmabr || item.nm).toLowerCase() === uf.toLowerCase());
     municipalities = (area?.mu || []).map(item => ({ code: String(item.cd || item.cdi || '').padStart(5, '0'), name: item.nm || item.nm_municipio || item.nome || item.nmabr || '' }))
       .filter(item => item.code && item.name).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    if (!selectedMunicipality) return { candidates: [], summary: null, municipalities, election: { code: election.cd, cycle: election.cycle } };
-    if (!municipalities.some(item => item.code === String(selectedMunicipality).padStart(5, '0'))) throw new Error('Município não encontrado na lista publicada pelo TSE.');
+    if (!selectedMunicipality && (municipal || includeMunicipalities)) return { candidates: [], summary: null, municipalities, election: { code: election.cd, cycle: election.cycle } };
+  }
+  if (selectedMunicipality) {
     selectedMunicipality = String(selectedMunicipality).padStart(5, '0');
+    if (includeMunicipalities && !municipalities.some(item => item.code === selectedMunicipality)) throw new Error('Município não encontrado na lista publicada pelo TSE.');
   }
   const paddedElection = String(election.cd).padStart(6, '0');
   const scope = selectedMunicipality ? `${region}${selectedMunicipality}` : region;
