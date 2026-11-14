@@ -5,9 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Activity, ArrowLeft, BarChart3, Building2, CalendarDays, CheckSquare, ChevronRight, FileText, Home, Landmark, Map, MapPin, Scale, Search, Share2, Sparkles, Star, UserRound, Users, Vote } from 'lucide-react-native';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { auth, TSE_HISTORICAL_URL } from '../ApiConfig';
+import { fetchTseLiveResults } from '../services/tseLiveResults';
 
 const ANALYSES_KEY = '@oassessor/political-strategy/analyses-v1';
-const YEARS = [2022, 2020, 2018, 2016, 2014, 2012];
+const YEARS = [2026, 2024, 2022, 2020, 2018, 2016, 2014, 2012];
 const OFFICES = [
   { label: 'Presidente', type: 'general' }, { label: 'Governador', type: 'general' },
   { label: 'Senador', type: 'general' }, { label: 'Deputado federal', type: 'general' },
@@ -67,6 +68,7 @@ export function PoliticalStrategyScreen({ navigation }) {
   const officeType = year % 4 === 0 ? 'municipal' : 'general';
   const availableOffices = OFFICES.filter(item => item.type === officeType);
   const isMunicipal = officeType === 'municipal';
+  const availableTurns = ['Presidente', 'Governador', 'Prefeito'].includes(office) ? [1, 2] : [1];
   const currentParams = useMemo(() => ({ year, turn, uf, cargo: office, municipalityCode: isMunicipal ? municipality?.code || '' : '' }), [year, turn, uf, office, isMunicipal, municipality?.code]);
 
   useEffect(() => {
@@ -78,10 +80,16 @@ export function PoliticalStrategyScreen({ navigation }) {
     setMunicipality(null);
   }, [year]);
 
+  useEffect(() => {
+    if (!availableTurns.includes(turn)) setTurn(1);
+  }, [office, year, turn]);
+
   const loadResults = useCallback(async (params = currentParams) => {
     setLoading(true); setError('');
     try {
-      const result = await fetchHistorical(params);
+      const result = params.year >= 2024
+        ? await fetchTseLiveResults({ ...params, cargo: params.cargo })
+        : await fetchHistorical(params);
       setCandidates(result.candidates || []); setSummary(result.summary || null);
       setMunicipalities(result.municipalities || []);
       return result;
@@ -91,10 +99,10 @@ export function PoliticalStrategyScreen({ navigation }) {
 
   useEffect(() => {
     if (page === 'elections' || page === 'candidates' || page === 'candidateDetail' || page === 'parties' || page === 'municipalities' || page === 'municipalityResult' || page === 'compare') {
-      if (!isMunicipal || municipality?.code) loadResults();
+      if (!isMunicipal || municipality?.code || year >= 2024) loadResults();
       else { setCandidates([]); setSummary(null); setMunicipalities([]); }
     }
-  }, [page, currentParams, isMunicipal, municipality?.code, loadResults]);
+  }, [page, currentParams, isMunicipal, municipality?.code, year, loadResults]);
 
   const openPage = id => { setSearch(''); setPage(id); if (id === 'compare') { setCompareCandidate(null); setSelectedCandidate(null); } };
   const saveAnalysis = async (item = {}) => {
@@ -125,7 +133,7 @@ export function PoliticalStrategyScreen({ navigation }) {
     <Text style={[styles.sectionTitle, { color: colors.text }]}>Filtros da análise</Text>
     <Text style={[styles.label, { color: colors.muted }]}>ELEIÇÃO</Text><View style={styles.chips}>{YEARS.map(item => chip(item, year === item, () => setYear(item)))}</View>
     <Text style={[styles.label, { color: colors.muted }]}>CARGO</Text><View style={styles.chips}>{availableOffices.map(item => chip(item.label.replace('Deputado ', 'Dep. '), office === item.label, () => setOffice(item.label)))}</View>
-    <Text style={[styles.label, { color: colors.muted }]}>TURNO</Text><View style={styles.chips}>{[1, 2].map(item => chip(`${item}º turno`, turn === item, () => setTurn(item)))}</View>
+    <Text style={[styles.label, { color: colors.muted }]}>TURNO</Text><View style={styles.chips}>{availableTurns.map(item => chip(`${item}º turno`, turn === item, () => setTurn(item)))}</View>
     {office !== 'Presidente' && <><Text style={[styles.label, { color: colors.muted }]}>ESTADO</Text><View style={styles.chips}>{UF.map(item => chip(item, uf === item, () => { setUf(item); setMunicipality(null); }))}</View></>}
     {isMunicipal && <><Text style={[styles.label, { color: colors.muted }]}>MUNICÍPIO</Text><TouchableOpacity onPress={() => { setPicker('municipality'); setPickerSearch(''); }} style={[styles.select, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}><Text style={{ color: colors.text, fontWeight: '700' }}>{municipality?.name || 'Selecionar município'}</Text><ChevronRight size={18} color={colors.primary} /></TouchableOpacity></>}
   </View>;
@@ -139,7 +147,7 @@ export function PoliticalStrategyScreen({ navigation }) {
         <MapPin size={17} color={colors.primary} /><View style={{ flex: 1 }}><Text style={[styles.fieldCaption, { color: colors.muted }]}>UF</Text><Text style={[styles.fieldValue, { color: colors.text }]}>{uf}</Text></View><ChevronRight size={16} color={colors.muted} />
       </TouchableOpacity>
     </View>
-    {showOffice && <><Text style={[styles.label, { color: colors.muted }]}>CARGO E TURNO</Text><View style={styles.chips}>{availableOffices.map(item => chip(item.label.replace('Deputado ', 'Dep. '), office === item.label, () => setOffice(item.label)))}</View><View style={[styles.chips, { marginTop: 8 }]}>{[1, 2].map(item => chip(`${item}º turno`, turn === item, () => setTurn(item)))}</View>{isMunicipal && <TouchableOpacity onPress={() => { setPicker('municipality'); setPickerSearch(''); }} style={[styles.select, { marginTop: 10, backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}><MapPin size={16} color={colors.primary} /><Text style={{ flex: 1, color: colors.text, fontWeight: '700' }}>{municipality?.name || 'Selecionar município'}</Text><ChevronRight size={17} color={colors.primary} /></TouchableOpacity>}</>}
+    {showOffice && <><Text style={[styles.label, { color: colors.muted }]}>CARGO E TURNO</Text><View style={styles.chips}>{availableOffices.map(item => chip(item.label.replace('Deputado ', 'Dep. '), office === item.label, () => setOffice(item.label)))}</View><View style={[styles.chips, { marginTop: 8 }]}>{availableTurns.map(item => chip(`${item}º turno`, turn === item, () => setTurn(item)))}</View>{isMunicipal && <TouchableOpacity onPress={() => { setPicker('municipality'); setPickerSearch(''); }} style={[styles.select, { marginTop: 10, backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}><MapPin size={16} color={colors.primary} /><Text style={{ flex: 1, color: colors.text, fontWeight: '700' }}>{municipality?.name || 'Selecionar município'}</Text><ChevronRight size={17} color={colors.primary} /></TouchableOpacity>}</>}
   </View>;
 
   const candidateList = <View style={cardStyle}><Text style={[styles.sectionTitle, { color: colors.text }]}>{page === 'parties' ? 'Votação por partido' : 'Candidatos mais votados'}</Text>{(page === 'parties' ? partyRows : filteredCandidates).slice(0, 60).map((item, index) => <TouchableOpacity key={item.id || item.name} onPress={() => { setSelectedCandidate(item); setPage('candidateDetail'); }} style={[styles.row, { borderTopColor: colors.border }]}><Text style={[styles.rank, { color: colors.primary, backgroundColor: colors.surfaceSecondary }]}>{index + 1}</Text><View style={{ flex: 1 }}><Text style={[styles.name, { color: colors.text }]}>{item.name}</Text><Text style={[styles.help, { color: colors.muted }]}>{page === 'parties' ? `${item.candidates} candidaturas` : `${item.number || ''}${item.party ? ` · ${item.party}` : ''}`}</Text></View><View style={styles.voteRight}><Text style={[styles.votes, { color: colors.text }]}>{format(item.votes)}</Text>{item.percent != null && <Text style={[styles.help, { color: colors.primary }]}>{pct(item.percent)}</Text>}</View><ChevronRight color={colors.muted} size={17} /></TouchableOpacity>)}</View>;
@@ -147,7 +155,7 @@ export function PoliticalStrategyScreen({ navigation }) {
   return <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: 16, paddingTop: Math.max(insets.top, 12) + 4, paddingBottom: 36 }} keyboardShouldPersistTaps="handled">
     {page === 'home' ? header : null}
     {page === 'home' ? <>
-      <View style={[styles.hero, { backgroundColor: colors.primary }]}><View style={styles.heroKicker}><Activity size={15} color="#a7f3d0" /><Text style={styles.heroKickerText}>BASE HISTÓRICA OFICIAL</Text><ChevronRight size={18} color="white" /></View><Text style={styles.heroTitle}>Estratégia Política</Text><Text style={styles.heroCopy}>Resultados eleitorais e leitura territorial para planejar com dados de 2012 a 2022.</Text><View style={styles.progressTrack}><View style={[styles.progressFill, { width: '100%' }]} /><Text style={styles.heroFoot}>TSE · dados disponíveis</Text></View></View>
+      <View style={[styles.hero, { backgroundColor: colors.primary }]}><View style={styles.heroKicker}><Activity size={15} color="#a7f3d0" /><Text style={styles.heroKickerText}>RESULTADOS OFICIAIS · TSE</Text><ChevronRight size={18} color="white" /></View><Text style={styles.heroTitle}>Estratégia Política</Text><Text style={styles.heroCopy}>Apurações de 2024 e 2026 e leitura territorial com o acervo histórico de 2012 a 2022.</Text><View style={styles.progressTrack}><View style={[styles.progressFill, { width: '100%' }]} /><Text style={styles.heroFoot}>TSE · dados disponíveis</Text></View></View>
       <View style={styles.navGrid}>{NAV.map(({ id, label, Icon }) => <TouchableOpacity key={id} onPress={() => openPage(id)} style={[styles.navTile, { backgroundColor: colors.surface, borderColor: colors.border }]}><Icon color={colors.muted} size={21} /><Text style={[styles.navLabel, { color: colors.text }]}>{label}</Text></TouchableOpacity>)}</View>
       <View style={styles.sectionHeading}><Text style={[styles.sectionTitle, { color: colors.text }]}>Últimas análises</Text><TouchableOpacity onPress={() => openPage('analysis')}><Text style={{ color: colors.primary, fontWeight: '800' }}>Ver todas ›</Text></TouchableOpacity></View>
       <View style={cardStyle}>{savedAnalyses.length ? savedAnalyses.slice(0, 5).map((item, index) => <TouchableOpacity key={item.id} onPress={() => { setYear(item.year); setTurn(item.turn); setOffice(item.office); setUf(item.uf); if (item.type === 'compare') openPage('compare'); else openPage(item.type === 'candidate' ? 'candidates' : 'elections'); }} style={[styles.row, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}><View style={[styles.roundIcon, { borderColor: colors.border }]}><MapPin color={colors.primary} size={18} /></View><View style={{ flex: 1 }}><Text style={[styles.name, { color: colors.text }]}>{item.title}</Text><Text style={[styles.help, { color: colors.primary }]}>{item.subtitle}</Text></View><ChevronRight color={colors.muted} size={18} /></TouchableOpacity>) : <Text style={[styles.emptyText, { color: colors.muted }]}>Salve uma análise para encontrá-la aqui.</Text>}</View>
