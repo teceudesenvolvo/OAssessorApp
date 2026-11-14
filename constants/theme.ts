@@ -1,53 +1,35 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const fontFamily = Platform.select({ ios: 'System', android: 'sans-serif', default: 'system-ui' });
+
+export const Fonts = {
+  family: fontFamily,
+  regular: { fontFamily, fontWeight: '400' as const },
+  medium: { fontFamily, fontWeight: '500' as const },
+  semibold: { fontFamily, fontWeight: '600' as const },
+  bold: { fontFamily, fontWeight: '700' as const },
+  title: { fontFamily, fontWeight: '700' as const, fontSize: 28, letterSpacing: -0.5 },
+  heading: { fontFamily, fontWeight: '700' as const, fontSize: 20, letterSpacing: -0.2 },
+  body: { fontFamily, fontWeight: '400' as const, fontSize: 16, lineHeight: 24 },
+  caption: { fontFamily, fontWeight: '500' as const, fontSize: 13, lineHeight: 18 },
+};
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#18211D', background: '#F5F7F5', surface: '#FFFFFF', surfaceSecondary: '#EDF2EE',
+    tint: '#137A45', primary: '#137A45', primarySoft: '#DDF4E5', onPrimary: '#FFFFFF',
+    icon: '#66736B', tabIconDefault: '#66736B', tabIconSelected: '#137A45',
+    border: '#DCE5DE', muted: '#68756D', danger: '#B42318', warning: '#A85D00',
+    header: '#113923', headerText: '#FFFFFF', overlay: 'rgba(16,35,24,0.45)',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#E8F0EA', background: '#101713', surface: '#19221C', surfaceSecondary: '#222E26',
+    tint: '#78D99A', primary: '#78D99A', primarySoft: '#203C2B', onPrimary: '#102117',
+    icon: '#A7B5AA', tabIconDefault: '#A7B5AA', tabIconSelected: '#78D99A',
+    border: '#2D3B31', muted: '#A7B5AA', danger: '#FF8A80', warning: '#F2B266',
+    header: '#101713', headerText: '#E8F0EA', overlay: 'rgba(0,0,0,0.55)',
   },
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const Spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
+export const Radius = { sm: 10, md: 16, lg: 24, pill: 999 };

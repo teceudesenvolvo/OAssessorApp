@@ -2,6 +2,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import { ArrowLeft, Save, Settings, User } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
+import { useThemedStyles } from '../../components/use-themed-styles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 import {
     ActivityIndicator,
     Alert,
@@ -14,9 +16,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth, GENERATE_TOKEN_URL } from '../../ApiConfig';
+import { auth, GENERATE_TOKEN_URL } from '../../ApiConfig';
+import { getDocument, updateDocument } from '../../services/firestoreData';
 
 export const EditProfileScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
+    const { colors: themeColors } = useAppTheme();
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
@@ -37,9 +42,7 @@ export const EditProfileScreen = ({ navigation }) => {
         }
 
         try {
-            const token = await user.getIdToken();
-            const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-            const data = await response.json();
+            const data = await getDocument('users', user.uid);
 
             if (data) {
                 setName(data.nome || '');
@@ -68,9 +71,8 @@ export const EditProfileScreen = ({ navigation }) => {
         setLoading(true);
         try {
             const user = auth.currentUser;
-            const token = user ? await user.getIdToken() : '';
             const payload = { nome: name, telefone: phone, updatedAt: new Date().toISOString() };
-            await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await updateDocument('users', user.uid, payload);
             Alert.alert('Sucesso', 'Seus dados foram atualizados!');
             navigation.goBack();
         } catch (error) {
@@ -118,7 +120,7 @@ export const EditProfileScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Meus </Text>
@@ -155,7 +157,7 @@ export const EditProfileScreen = ({ navigation }) => {
                             style={styles.input}
                             value={name}
                             onChangeText={setName}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor={themeColors.muted}
                         />
                          <Text style={styles.label}>Telefone</Text>
                         <TextInput
@@ -163,51 +165,51 @@ export const EditProfileScreen = ({ navigation }) => {
                             value={phone}
                             onChangeText={setPhone}
                             keyboardType="phone-pad"
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor={themeColors.muted}
                         />
 
                         <Text style={styles.label}>Email</Text>
                         <TextInput
-                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            style={[styles.input, { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]}
                             value={email}
                             keyboardType="email-address"
                             autoCapitalize="none"
                             editable={false}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor={themeColors.muted}
                         />
 
                         <Text style={styles.label}>CPF</Text>
                         <TextInput
-                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            style={[styles.input, { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]}
                             value={cpf}
                             editable={false}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor={themeColors.muted}
                         />
 
                        
 
                         <Text style={styles.label}>Cargo</Text>
                         <TextInput
-                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            style={[styles.input, { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]}
                             value={cargo}
                             editable={false}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor={themeColors.muted}
                         />
 
                         <Text style={styles.label}>Tipo de Usuário</Text>
                         <TextInput
-                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            style={[styles.input, { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]}
                             value={tipoUser}
                             editable={false}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor={themeColors.muted}
                         />
 
                         <Text style={styles.label}>Data de Criação</Text>
                         <TextInput
-                            style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]}
+                            style={[styles.input, { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]}
                             value={createdAt}
                             editable={false}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor={themeColors.muted}
                         />
 
 
@@ -244,7 +246,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -269,3 +271,5 @@ const styles = StyleSheet.create({
     button: { height: 56, backgroundColor: colors.primaryGreen, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24, elevation: 4 },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },
 });
+
+const styles = baseStyles;

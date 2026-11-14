@@ -1,7 +1,9 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
 import { ArrowLeft, ChevronDown, HelpCircle } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export const HelpScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
     const faqs = [
         { id: 1, question: 'Como cadastrar um novo eleitor?', answer: 'Vá até a aba "Novo" no menu inferior ou clique no botão "+" na tela inicial.' },
         { id: 2, question: 'Como exportar relatórios?', answer: 'Na tela de lista de eleitores, clique no ícone de documento acima do botão de adicionar.' },
@@ -13,7 +15,7 @@ export const HelpScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Ajuda e </Text>
@@ -66,7 +68,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -94,3 +96,5 @@ const styles = StyleSheet.create({
     button: { height: 56, backgroundColor: colors.primaryGreen, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', elevation: 4 },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },
 });
+
+const styles = baseStyles;

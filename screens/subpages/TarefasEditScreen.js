@@ -1,3 +1,5 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ArrowLeft, MessageSquare, Save, Send, Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -13,9 +15,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth } from '../../ApiConfig';
+import { auth } from '../../ApiConfig';
+import { addNestedDocument, deleteDocument, getDocument, getNestedDocuments, updateDocument } from '../../services/firestoreData';
 
 export const TarefasEditScreen = ({ navigation, route }) => {
+    const styles = useThemedStyles(baseStyles);
+    const { colors: themeColors } = useAppTheme();
     const { task } = route.params;
     
     // Estados do Formulário
@@ -49,8 +54,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
         const user = auth.currentUser;
         if (user) {
             try {
-                const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
-                const data = await response.json();
+                const data = await getDocument('users', user.uid);
                 if (data && data.nome) {
                     setUserName(data.nome);
                 }
@@ -62,13 +66,9 @@ export const TarefasEditScreen = ({ navigation, route }) => {
 
     const fetchComments = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/tarefas/${task.id}/comentarios.json`);
-            const data = await response.json();
-            if (data) {
-                const loadedComments = Object.keys(data).map(key => ({
-                    id: key,
-                    ...data[key]
-                })).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            const loadedComments = await getNestedDocuments('tarefas', task.id, 'comentarios');
+            if (loadedComments.length) {
+                loadedComments.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
                 setComments(loadedComments);
             } else {
                 setComments([]);
@@ -98,7 +98,6 @@ export const TarefasEditScreen = ({ navigation, route }) => {
         setLoading(true);
         try {
             const user = auth.currentUser;
-            const token = user ? await user.getIdToken() : '';
 
             const payload = {
                 titulo,
@@ -110,11 +109,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                 updatedAt: new Date().toISOString()
             };
 
-            await fetch(`${API_BASE_URL}/tarefas/${task.id}.json?auth=${token}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            await updateDocument('tarefas', task.id, payload);
 
             Alert.alert('Sucesso', 'Tarefa atualizada com sucesso!');
             navigation.goBack();
@@ -133,7 +128,6 @@ export const TarefasEditScreen = ({ navigation, route }) => {
         const user = auth.currentUser;
         
         try {
-            const token = user ? await user.getIdToken() : '';
             const commentPayload = {
                 text: newComment,
                 userId: user?.uid,
@@ -141,11 +135,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                 createdAt: new Date().toISOString()
             };
 
-            await fetch(`${API_BASE_URL}/tarefas/${task.id}/comentarios.json?auth=${token}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(commentPayload)
-            });
+            await addNestedDocument('tarefas', task.id, 'comentarios', commentPayload);
 
             setNewComment('');
             fetchComments(); // Recarrega a lista
@@ -167,9 +157,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const user = auth.currentUser;
-                            const token = user ? await user.getIdToken() : '';
-                            await fetch(`${API_BASE_URL}/tarefas/${task.id}.json?auth=${token}`, { method: 'DELETE' });
+                            await deleteDocument('tarefas', task.id);
                             navigation.goBack();
                         } catch (error) {
                             Alert.alert('Erro', 'Não foi possível excluir a tarefa.');
@@ -185,7 +173,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Editar</Text>
@@ -214,7 +202,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                                 <Text style={styles.label}>Data</Text>
                                 {Platform.OS === 'android' ? (
                                     <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => showModeAndroid('date')}>
-                                        <Text style={{ fontSize: 16, color: colors.textDark }}>{date.toLocaleDateString('pt-BR')}</Text>
+                                        <Text style={{ fontSize: 16, color: themeColors.text }}>{date.toLocaleDateString('pt-BR')}</Text>
                                     </TouchableOpacity>
                                 ) : (
                                     <View style={[styles.input, { justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 8 }]}>
@@ -226,7 +214,7 @@ export const TarefasEditScreen = ({ navigation, route }) => {
                                 <Text style={styles.label}>Hora</Text>
                                 {Platform.OS === 'android' ? (
                                     <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => showModeAndroid('time')}>
-                                        <Text style={{ fontSize: 16, color: colors.textDark }}>{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                                        <Text style={{ fontSize: 16, color: themeColors.text }}>{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
                                     </TouchableOpacity>
                                 ) : (
                                     <View style={[styles.input, { justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 8 }]}>
@@ -322,7 +310,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -379,3 +367,5 @@ const styles = StyleSheet.create({
     commentInput: { flex: 1, backgroundColor: '#f1f5f9', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, maxHeight: 80, color: colors.textDark },
     sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryGreen, justifyContent: 'center', alignItems: 'center' },
 });
+
+const styles = baseStyles;

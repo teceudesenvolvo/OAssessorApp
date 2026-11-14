@@ -3,6 +3,9 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { FileText, Filter, Link, MapPin, Phone, Plus, Search, UserPlus } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
+import { useThemedStyles } from '../components/use-themed-styles';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import {
     ActivityIndicator,
     Alert,
@@ -14,9 +17,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth } from '../ApiConfig';
+import { auth, db } from '../ApiConfig';
+import { getDocument } from '../services/firestoreData';
 
 export const EleitorCadastroScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
+    const { colors: themeColors } = useAppTheme();
     const [searchText, setSearchText] = useState('');
     const [eleitores, setEleitores] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -28,26 +34,22 @@ export const EleitorCadastroScreen = ({ navigation }) => {
             setLoading(true);
             const user = auth.currentUser;
             if (!user) return;
-            const token = await user.getIdToken();
 
-            // 1. Buscar Eleitores e filtrar pelo ID do usuário logado
-            const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
-            const dataEleitores = await responseEleitores.json();
-            
-            const loadedEleitores = [];
-            if (dataEleitores) {
-                for (const key in dataEleitores) {
-                    if (dataEleitores[key].creatorId === user.uid) {
-                        loadedEleitores.push({ id: key, ...dataEleitores[key] });
-                    }
-                }
-            }
+            // Buscar eleitores no Cloud Firestore criados pelo usuário logado.
+            const eleitoresQuery = query(
+                collection(db, 'eleitores'),
+                where('creatorId', '==', user.uid)
+            );
+            const eleitoresSnapshot = await getDocs(eleitoresQuery);
+            const loadedEleitores = eleitoresSnapshot.docs.map(document => ({
+                id: document.id,
+                ...document.data(),
+            }));
             setEleitores(loadedEleitores);
 
             // 2. Buscar dados do usuário para pegar o tipoPlano
             // Assumindo que os usuários estão salvos em users/{uid}
-            const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-            const dataUser = await responseUser.json();
+            const dataUser = await getDocument('users', user.uid);
             if (dataUser && dataUser.tipoPlano) {
                 setPlano(dataUser.tipoPlano);
                 // Define o limite com base no plano do usuário
@@ -139,8 +141,8 @@ export const EleitorCadastroScreen = ({ navigation }) => {
     };
 
     const filteredList = eleitores.filter(e => 
-        e.nome.toLowerCase().includes(searchText.toLowerCase()) ||
-        e.bairro.toLowerCase().includes(searchText.toLowerCase())
+        (e.nome || '').toLowerCase().includes(searchText.toLowerCase()) ||
+        (e.bairro || '').toLowerCase().includes(searchText.toLowerCase())
     );
 
     return (
@@ -166,32 +168,32 @@ export const EleitorCadastroScreen = ({ navigation }) => {
                         </View>
                     </View>
                     <View style={styles.iconBox}>
-                        <UserPlus size={28} color="#6EE794" />
+                        <UserPlus size={28} color={themeColors.primary} />
                     </View>
                 </View>
                     
                 {/* Barra de Pesquisa */}
                 <View style={styles.searchContainer}>
-                    <Search size={20} color="#94a3b8" style={{ marginRight: 10 }} />
+                    <Search size={20} color={themeColors.muted} style={{ marginRight: 10 }} />
                     <TextInput 
                         style={styles.searchInput}
                         placeholder="Buscar por nome ou bairro..."
-                        placeholderTextColor="#94a3b8"
+                        placeholderTextColor={themeColors.muted}
                         value={searchText}
                         onChangeText={setSearchText}
                     />
                     <TouchableOpacity style={styles.filterButton}>
-                        <Filter size={20} color="white" />
+                        <Filter size={20} color={themeColors.onPrimary} />
                     </TouchableOpacity>
                 </View>
             </View>
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100, paddingTop: 20 }}>
                 {loading ? (
-                    <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 40 }} />
+                    <ActivityIndicator size="large" color={themeColors.primary} style={{ marginTop: 40 }} />
                 ) : filteredList.length === 0 ? (
                     <View style={{ alignItems: 'center', marginTop: 40 }}>
-                        <Text style={{ color: '#94a3b8' }}>Nenhum eleitor encontrado.</Text>
+                        <Text style={{ color: themeColors.muted }}>Nenhum eleitor encontrado.</Text>
                     </View>
                 ) : (
                     filteredList.map(item => (
@@ -199,37 +201,37 @@ export const EleitorCadastroScreen = ({ navigation }) => {
                             <View style={styles.eleitorInfo}>
                                 <Text style={styles.eleitorName}>{item.nome}</Text>
                                 <View style={styles.eleitorMeta}>
-                                    <MapPin size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                                    <MapPin size={14} color={themeColors.muted} style={{ marginRight: 4 }} />
                                     <Text style={styles.eleitorText}>{item.bairro || 'Sem bairro'}</Text>
                                 </View>
                                 <View style={styles.eleitorMeta}>
-                                    <Phone size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                                    <Phone size={14} color={themeColors.muted} style={{ marginRight: 4 }} />
                                     <Text style={styles.eleitorText}>{item.telefone || 'Sem telefone'}</Text>
                                 </View>
                             </View>
-                            <View style={[styles.statusBadge, { backgroundColor: item.status === 'Apoiador' ? '#dcfce7' : '#f1f5f9' }]}>
-                                <Text style={[styles.statusText, { color: item.status === 'Apoiador' ? '#166534' : '#64748b' }]}>{item.status || 'Novo'}</Text>
+                            <View style={[styles.statusBadge, { backgroundColor: item.status === 'Apoiador' ? themeColors.primarySoft : themeColors.surfaceSecondary }]}>
+                                <Text style={[styles.statusText, { color: item.status === 'Apoiador' ? themeColors.primary : themeColors.muted }]}>{item.status || 'Novo'}</Text>
                             </View>
                         </TouchableOpacity>
                     ))
                 )}
             </ScrollView>
 
-            <TouchableOpacity style={[styles.fab, { bottom: 250, backgroundColor: 'white', marginBottom: 30 }]} onPress={handleExportPDF}>
+            <TouchableOpacity style={[styles.fab, { bottom: 250, backgroundColor: themeColors.surface, marginBottom: 30 }]} onPress={handleExportPDF}>
                 <View pointerEvents="none">
-                    <FileText size={24} color="#6EE794" />
+                    <FileText size={24} color={themeColors.primary} />
                 </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: 'white', marginBottom: 30 }]} onPress={handleShareFormLink}>
+            <TouchableOpacity style={[styles.fab, { bottom: 180, backgroundColor: themeColors.surface, marginBottom: 30 }]} onPress={handleShareFormLink}>
                 <View pointerEvents="none">
-                    <Link size={24} color="#6EE794" />
+                    <Link size={24} color={themeColors.primary} />
                 </View>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.fab, {marginBottom: 30}]} onPress={() => navigation.navigate('EleitorForm')}>
                 <View pointerEvents="none">
-                    <Plus size={24} color="white" />
+                    <Plus size={24} color={themeColors.onPrimary} />
                 </View>
             </TouchableOpacity>
         </View>
@@ -244,7 +246,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -301,3 +303,5 @@ const styles = StyleSheet.create({
     statusText: { fontSize: 10, fontWeight: 'bold' },
     fab: { position: 'absolute', bottom: 110, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primaryGreen, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, zIndex: 999 },
 });
+
+const styles = baseStyles;

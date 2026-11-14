@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
 import { ArrowLeft, Cake, Gift, MessageCircle } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,10 +11,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth } from '../../ApiConfig';
+import { auth } from '../../ApiConfig';
+import { getDocument } from '../../services/firestoreData';
 import ImageAniversario from '../../assets/images/aniversario.png';
 
 export const AniversarianteScreen = ({ navigation, route }) => {
+    const styles = useThemedStyles(baseStyles);
     const { person } = route.params;
     const [senderName, setSenderName] = useState('Sua Equipe');
 
@@ -22,8 +25,7 @@ export const AniversarianteScreen = ({ navigation, route }) => {
             const user = auth.currentUser;
             if (user) {
                 try {
-                    const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
-                    const data = await response.json();
+                    const data = await getDocument('users', user.uid);
                     if (data && data.nome) {
                         setSenderName(data.nome);
                     }
@@ -71,7 +73,7 @@ export const AniversarianteScreen = ({ navigation, route }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Feliz</Text>
@@ -129,7 +131,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -178,3 +180,5 @@ const styles = StyleSheet.create({
     whatsappButton: { width: '100%', height: 56, backgroundColor: '#25D366', borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', shadowColor: '#25D366', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
     buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 });
+
+const styles = baseStyles;

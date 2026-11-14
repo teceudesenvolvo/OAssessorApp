@@ -1,3 +1,5 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 import { ArrowLeft, Save, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
@@ -13,7 +15,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth, CLOUD_FUNCTION_URL } from '../../ApiConfig';
+import { auth, CLOUD_FUNCTION_URL } from '../../ApiConfig';
+import { deleteDocument, updateDocument } from '../../services/firestoreData';
 
 // Funções de Máscara
 const maskCPF = (value) => {
@@ -34,6 +37,8 @@ const maskPhone = (value) => {
 };
 
 export const AssessorEditScreen = ({ navigation, route }) => {
+    const styles = useThemedStyles(baseStyles);
+    const { colors: themeColors } = useAppTheme();
     const { assessor } = route.params;
     const [loading, setLoading] = useState(false);
 
@@ -89,9 +94,6 @@ export const AssessorEditScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
-            const user = auth.currentUser;
-            const token = user ? await user.getIdToken() : '';
-
             const payload = {
                 nome,
                 cargo,
@@ -102,18 +104,10 @@ export const AssessorEditScreen = ({ navigation, route }) => {
             };
 
             // Atualiza na coleção de assessores
-            await fetch(`${API_BASE_URL}/assessores/${assessor.id}.json?auth=${token}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            await updateDocument('assessores', assessor.id, payload);
 
             // Atualiza na coleção de users (se o ID for o mesmo)
-            await fetch(`${API_BASE_URL}/users/${assessor.id}.json?auth=${token}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            await updateDocument('users', assessor.id, payload);
 
             if (isConvidado && email !== assessor.email) {
                 await sendInviteEmail(nome, email);
@@ -141,11 +135,8 @@ export const AssessorEditScreen = ({ navigation, route }) => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const user = auth.currentUser;
-                            const token = user ? await user.getIdToken() : '';
-
-                            await fetch(`${API_BASE_URL}/assessores/${assessor.id}.json?auth=${token}`, { method: 'DELETE' });
-                            await fetch(`${API_BASE_URL}/users/${assessor.id}.json?auth=${token}`, { method: 'DELETE' });
+                            await deleteDocument('assessores', assessor.id);
+                            await deleteDocument('users', assessor.id);
                             navigation.goBack();
                         } catch (error) {
                             console.error(error);
@@ -162,8 +153,8 @@ export const AssessorEditScreen = ({ navigation, route }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
-                            <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <ArrowLeft size={20} color={themeColors.headerText} style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Editar</Text>
                                 <Text style={styles.textWhite}> Assessor</Text>
@@ -182,19 +173,19 @@ export const AssessorEditScreen = ({ navigation, route }) => {
                         <Text style={styles.sectionTitle}>Dados do Membro</Text>
 
                         <Text style={styles.label}>Nome Completo</Text>
-                        <TextInput style={styles.input} placeholder="Ex: Roberto Almeida" placeholderTextColor="#64748b" value={nome} onChangeText={setNome} />
+                        <TextInput style={styles.input} placeholder="Ex: Roberto Almeida" placeholderTextColor={themeColors.muted} value={nome} onChangeText={setNome} />
 
                         <Text style={styles.label}>Cargo / Função</Text>
-                        <TextInput style={styles.input} placeholder="Ex: Coord. Geral" placeholderTextColor="#64748b" value={cargo} onChangeText={setCargo} />
+                        <TextInput style={styles.input} placeholder="Ex: Coord. Geral" placeholderTextColor={themeColors.muted} value={cargo} onChangeText={setCargo} />
 
                         <Text style={styles.label}>CPF</Text>
-                        <TextInput style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]} placeholder="000.000.000-00" placeholderTextColor="#64748b" keyboardType="numeric" maxLength={14} value={cpf} editable={false} />
+                        <TextInput style={[styles.input, { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]} placeholder="000.000.000-00" placeholderTextColor={themeColors.muted} keyboardType="numeric" maxLength={14} value={cpf} editable={false} />
 
                         <Text style={styles.label}>Telefone / WhatsApp</Text>
-                        <TextInput style={[styles.input, { backgroundColor: '#e2e8f0', color: '#94a3b8' }]} placeholder="Ex: (11) 99999-9999" placeholderTextColor="#64748b" keyboardType="phone-pad" maxLength={15} value={telefone} editable={false} />
+                        <TextInput style={[styles.input, { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]} placeholder="Ex: (11) 99999-9999" placeholderTextColor={themeColors.muted} keyboardType="phone-pad" maxLength={15} value={telefone} editable={false} />
 
                         <Text style={styles.label}>Email</Text>
-                        <TextInput style={[styles.input, !isConvidado && { backgroundColor: '#e2e8f0', color: '#94a3b8' }]} placeholder="Ex: roberto@equipe.com" placeholderTextColor="#64748b" keyboardType="email-address" autoCapitalize="none" value={email} editable={isConvidado} onChangeText={setEmail} />
+                        <TextInput style={[styles.input, !isConvidado && { backgroundColor: themeColors.surfaceSecondary, color: themeColors.muted }]} placeholder="Ex: roberto@equipe.com" placeholderTextColor={themeColors.muted} keyboardType="email-address" autoCapitalize="none" value={email} editable={isConvidado} onChangeText={setEmail} />
 
                         <TouchableOpacity style={styles.button} onPress={handleUpdate} disabled={loading}>
                             {loading ? (
@@ -221,7 +212,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -260,3 +251,5 @@ const styles = StyleSheet.create({
     button: { height: 56, backgroundColor: colors.primaryGreen, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24, shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },
 });
+
+const styles = baseStyles;

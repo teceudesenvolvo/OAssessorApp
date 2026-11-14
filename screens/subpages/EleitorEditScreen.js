@@ -1,3 +1,5 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 import { ArrowLeft, ArrowRight, ChevronDown, Save, UserCog } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
@@ -14,7 +16,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { API_BASE_URL, auth } from '../../ApiConfig';
+import { auth } from '../../ApiConfig';
+import { getCollection, updateDocument } from '../../services/firestoreData';
 
 // Funções de Máscara
 const maskCPF = (value) => {
@@ -50,6 +53,8 @@ const maskCEP = (value) => {
 };
 
 export const EleitorEditScreen = ({ navigation, route }) => {
+    const styles = useThemedStyles(baseStyles);
+    const { colors: themeColors } = useAppTheme();
     const { eleitor } = route.params;
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -79,12 +84,8 @@ export const EleitorEditScreen = ({ navigation, route }) => {
     const [showLocalPicker, setShowLocalPicker] = useState(false);
 
     useEffect(() => {
-        fetch(`${API_BASE_URL}/localvotacao.json`)
-            .then(res => res.json())
-            .then(data => {
-                const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-                setLocaisList(list);
-            })
+        getCollection('localvotacao')
+            .then(setLocaisList)
             .catch(err => console.log('Erro ao buscar locais:', err));
     }, []);
 
@@ -126,7 +127,6 @@ export const EleitorEditScreen = ({ navigation, route }) => {
         setLoading(true);
         try {
             const user = auth.currentUser;
-            const token = user ? await user.getIdToken() : '';
             const creatorEmail = user?.email || '';
 
             const payload = {
@@ -153,14 +153,8 @@ export const EleitorEditScreen = ({ navigation, route }) => {
                 creatorEmail: creatorEmail // Atualiza com o email do usuário logado conforme solicitado
             };
 
-            // Usa PATCH para atualizar apenas os campos enviados, mantendo creatorId e createdAt originais
-            const response = await fetch(`${API_BASE_URL}/eleitores/${eleitor.id}.json?auth=${token}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) throw new Error('Falha ao atualizar');
+            // Atualiza apenas os campos enviados, preservando creatorId e createdAt.
+            await updateDocument('eleitores', eleitor.id, payload);
 
             Alert.alert('Sucesso', 'Dados do eleitor atualizados com sucesso!');
             navigation.goBack();
@@ -177,8 +171,8 @@ export const EleitorEditScreen = ({ navigation, route }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
-                            <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <ArrowLeft size={20} color={themeColors.headerText} style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Editar</Text>
                                 <Text style={styles.textWhite}> Eleitor</Text>
@@ -219,7 +213,7 @@ export const EleitorEditScreen = ({ navigation, route }) => {
 
                                 <Text style={styles.label}>Sexo</Text>
                                 <TouchableOpacity style={styles.selectButton} onPress={() => setShowSexoPicker(true)}>
-                                    <Text style={{ color: sexo ? colors.textDark : '#64748b', fontSize: 16 }}>
+                                    <Text style={{ color: sexo ? themeColors.text : themeColors.muted, fontSize: 16 }}>
                                         {sexo || 'Selecione o sexo'}
                                     </Text>
                                     <ChevronDown size={20} color="#64748b" />
@@ -303,7 +297,7 @@ export const EleitorEditScreen = ({ navigation, route }) => {
                                     onPress={() => zona && setShowLocalPicker(true)}
                                     disabled={!zona}
                                 >
-                                    <Text style={{ color: localVotacao ? colors.textDark : '#64748b', fontSize: 16, flex: 1 }} numberOfLines={1}>
+                                    <Text style={{ color: localVotacao ? themeColors.text : themeColors.muted, fontSize: 16, flex: 1 }} numberOfLines={1}>
                                         {localVotacao || (zona ? 'Selecione o local' : 'Preencha a Zona primeiro')}
                                     </Text>
                                     <ChevronDown size={20} color="#64748b" />
@@ -354,24 +348,26 @@ export const EleitorEditScreen = ({ navigation, route }) => {
 };
 
 const SimplePicker = ({ visible, options, onSelect, onClose, title, displayKey }) => {
+    const styles = useThemedStyles(baseStyles);
+    const { colors } = useAppTheme();
     if (!visible) return null;
     return (
         <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
             <TouchableOpacity style={{flex:1, backgroundColor:'rgba(0,0,0,0.5)', justifyContent:'center', padding: 20}} onPress={onClose}>
-                <View style={{backgroundColor:'white', borderRadius:10, maxHeight:'80%'}}>
-                    <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:15, borderBottomWidth:1, borderColor:'#eee'}}>
-                        <Text style={{fontWeight:'bold', fontSize:16}}>{title}</Text>
-                        <TouchableOpacity onPress={onClose}><Text style={{color:'#ef4444'}}>Fechar</Text></TouchableOpacity>
+                <View style={{backgroundColor: colors.surface, borderRadius:18, maxHeight:'80%'}}>
+                    <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:15, borderBottomWidth:1, borderColor:colors.border}}>
+                        <Text style={{fontWeight:'700', fontSize:16, color: colors.text}}>{title}</Text>
+                        <TouchableOpacity onPress={onClose}><Text style={{color:colors.danger}}>Fechar</Text></TouchableOpacity>
                     </View>
                     {options.length === 0 ? (
-                        <Text style={{padding:20, textAlign:'center', color:'#64748b'}}>Nenhum local encontrado para esta zona.</Text>
+                        <Text style={{padding:20, textAlign:'center', color:colors.muted}}>Nenhum local encontrado para esta zona.</Text>
                     ) : (
                         <FlatList
                             data={options}
                             keyExtractor={(item, i) => i.toString()}
                             renderItem={({item}) => (
-                                <TouchableOpacity style={{padding:15, borderBottomWidth:1, borderColor:'#f0f0f0'}} onPress={() => { onSelect(item); onClose(); }}>
-                                    <Text style={{fontSize:16, color:'#334155'}}>{displayKey ? (item[displayKey] || JSON.stringify(item)) : item}</Text>
+                                <TouchableOpacity style={{padding:15, borderBottomWidth:1, borderColor:colors.border}} onPress={() => { onSelect(item); onClose(); }}>
+                                    <Text style={{fontSize:16, color:colors.text}}>{displayKey ? (item[displayKey] || JSON.stringify(item)) : item}</Text>
                                 </TouchableOpacity>
                             )}
                         />
@@ -390,7 +386,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -435,3 +431,5 @@ const styles = StyleSheet.create({
     buttonRow: { flexDirection: 'row', alignItems: 'center', marginTop: 24 },
     backButton: { height: 56, width: 56, backgroundColor: '#f1f5f9', borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
 });
+
+const styles = baseStyles;

@@ -1,3 +1,5 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { useRef, useState } from 'react';
 import {
@@ -15,9 +17,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_BASE_URL, auth } from '../../ApiConfig';
+import { auth } from '../../ApiConfig';
+import { getDocument } from '../../services/firestoreData';
 
 export const LoginScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
+  const { colors: themeColors } = useAppTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,8 +49,7 @@ export const LoginScreen = ({ navigation }) => {
       const user = userCredential.user;
 
       // Buscar dados do usuário para verificar o tipo
-      const response = await fetch(`${API_BASE_URL}/users/${user.uid}.json`);
-      const userData = await response.json();
+      const userData = await getDocument('users', user.uid);
 
       // Lógica de Redirecionamento:
       // Se tipoUser for 'assessor' -> vai para AssessorScreen (rota 'Assessor')
@@ -124,7 +128,7 @@ export const LoginScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#101422" />
+      <StatusBar barStyle="light-content" backgroundColor={themeColors.header} />
       
       {/* Comportamento para evitar que o teclado cubra os inputs */}
       <KeyboardAvoidingView
@@ -178,7 +182,7 @@ export const LoginScreen = ({ navigation }) => {
 
           <TouchableOpacity ref={buttonRef} style={styles.button} onPress={handleLogin} disabled={loading}>
             {loading ? (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={themeColors.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>Entrar</Text>
             )}
@@ -220,7 +224,7 @@ const colors = {
   textDark: '#000000',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.backgroundDark,
@@ -229,7 +233,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    flex: 1, // Ocupa a metade superior (ajustável)
+    flex: 0.9,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.backgroundDark,
@@ -258,15 +262,14 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   formContainer: {
-    flex: 1.2, // Ocupa um pouco mais que a metade inferior
+    flex: 1.1,
     backgroundColor: colors.white,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingHorizontal: 30,
-    paddingTop: 40,
-    paddingBottom: 100,
-    marginTop: -50,
-    marginBottom: -50,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 32,
+    marginTop: -24,
   },
   title: {
     fontSize: 20,
@@ -277,7 +280,7 @@ const styles = StyleSheet.create({
   input: {
     height: 55,
     backgroundColor: colors.inputBackground,
-    borderRadius: 8,
+    borderRadius: 14,
     paddingHorizontal: 15,
     marginBottom: 15,
     fontSize: 16,
@@ -292,7 +295,7 @@ const styles = StyleSheet.create({
   button: {
     height: 55,
     backgroundColor: colors.primaryGreen,
-    borderRadius: 8,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
@@ -336,3 +339,5 @@ const styles = StyleSheet.create({
     elevation: 100, 
   },
 });
+
+const styles = baseStyles;

@@ -1,10 +1,42 @@
 const { onRequest } = require("firebase-functions/v2/https");
-const functions = require("firebase-functions/v1");
-// const { onValueCreated } = require("firebase-functions/v2/database");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
+const { queryTseHistorical } = require('./tseHistorical');
 
 admin.initializeApp();
+
+// Results from old elections are no longer served by the live results catalog.
+// Fetch the official TSE open-data CSV server-side and return normalized rows
+// to the native app; the client never leaves the app or downloads the archive.
+exports.tseHistoricalResults = onRequest({
+  cors: true,
+  invoker: 'public',
+  timeoutSeconds: 540,
+  memory: '4GiB',
+  concurrency: 5,
+}, async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+  const authorization = req.headers.authorization || '';
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!token) return res.status(401).json({ error: 'Autenticação necessária.' });
+  try {
+    await admin.auth().verifyIdToken(token);
+    const input = req.body || {};
+    const cargoCodes = { Presidente: '1', Governador: '3', Senador: '5', 'Deputado federal': '6', 'Deputado estadual/distrital': '7', Prefeito: '11', Vereador: '13' };
+    const cacheKey = [Number(input.year), String(input.uf || '').toUpperCase(), Number(input.turn), cargoCodes[input.cargo] || 'x', String(input.municipalityCode || 'municipalities')].join('_');
+    const cacheRef = admin.firestore().collection('tseHistoricalStaticCache').doc(cacheKey);
+    const cached = await cacheRef.get();
+    if (cached.exists) return res.status(200).json(cached.data());
+    const result = await queryTseHistorical(input);
+    await cacheRef.set({ ...result, cachedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[TSE histórico]', error);
+    const clientError = /inválidos|não reconhecido/.test(error.message || '');
+    return res.status(clientError ? 400 : 502).json({ error: error.message || 'Não foi possível consultar o acervo do TSE.' });
+  }
+});
 
 // Configure o transportador do Nodemailer (ex: Gmail)
 // IMPORTANTE: Para Gmail, use uma "Senha de App" (App Password) gerada na conta Google.
@@ -58,9 +90,9 @@ exports.sendInviteEmail = onRequest({ cors: true, invoker: 'public' }, async (re
     }
 });
 
-exports.sendPushOnNotification = functions.database.ref("/notificacoes/{notificationId}").onCreate(async (snapshot, context) => {
-    const notification = snapshot.val();
-    console.log("Nova notificação detectada:", context.params.notificationId);
+exports.sendPushOnNotification = onDocumentCreated("notificacoes/{notificationId}", async (event) => {
+    const notification = event.data?.data();
+    console.log("Nova notificação detectada:", event.params.notificationId);
     
     if (!notification) return;
 
@@ -73,8 +105,8 @@ exports.sendPushOnNotification = functions.database.ref("/notificacoes/{notifica
 
     try {
         // Busca o token de push do usuário no banco de dados
-        const userSnapshot = await admin.database().ref(`/users/${userId}`).once('value');
-        const userData = userSnapshot.val();
+        const userSnapshot = await admin.firestore().collection('users').doc(userId).get();
+        const userData = userSnapshot.exists ? userSnapshot.data() : null;
 
         if (!userData || !userData.pushToken) {
             console.log(`FALHA: Usuário ${userId} encontrado? ${!!userData}. Token existe? ${!!userData?.pushToken}`);
@@ -125,7 +157,9 @@ exports.sendPushOnNotification = functions.database.ref("/notificacoes/{notifica
                 console.error(`Detalhe do erro: ${ticket.details.error}`);
                 // Se o erro for DeviceNotRegistered, podemos remover o token do banco
                 if (ticket.details.error === 'DeviceNotRegistered') {
-                    await admin.database().ref(`/users/${userId}/pushToken`).remove();
+                    await admin.firestore().collection('users').doc(userId).update({
+                        pushToken: admin.firestore.FieldValue.delete(),
+                    });
                     console.log(`Token inválido removido para o usuário ${userId}`);
                 }
             }

@@ -1,10 +1,15 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Bell, Check, Clock, MessageSquare } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { API_BASE_URL, auth } from '../../ApiConfig';
+import { auth } from '../../ApiConfig';
+import { getCollection, updateDocument } from '../../services/firestoreData';
 
 export const NotificacoesScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
+  const { colors: themeColors } = useAppTheme();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,14 +19,11 @@ export const NotificacoesScreen = ({ navigation }) => {
       const user = auth.currentUser;
       if (!user) return;
 
-      const token = await user.getIdToken();
-      const response = await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`);
-      const data = await response.json();
+      const data = await getCollection('notificacoes', [['userId', user.uid]]);
 
-      if (data) {
+      if (data.length) {
         const userEmail = user.email;
-        const loadedNotifications = Object.keys(data)
-          .map(key => ({ id: key, ...data[key] }))
+        const loadedNotifications = data
           .filter(n => {
             // Filtra se userEmail não for vazio e for igual ao do usuário logado
             // OU se userEmail for vazio (global)
@@ -52,13 +54,7 @@ export const NotificacoesScreen = ({ navigation }) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
 
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : '';
-      await fetch(`${API_BASE_URL}/notificacoes/${id}.json?auth=${token}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ read: true })
-      });
+      await updateDocument('notificacoes', id, { read: true });
     } catch (error) {
       console.error(error);
     }
@@ -76,10 +72,10 @@ export const NotificacoesScreen = ({ navigation }) => {
 
   const getIcon = (type) => {
     switch (type) {
-      case 'task': return <Clock size={24} color="#3b82f6" />;
-      case 'success': return <Check size={24} color="#10b981" />;
-      case 'birthday': return <MessageSquare size={24} color="#f59e0b" />;
-      default: return <Bell size={24} color="#64748b" />;
+      case 'task': return <Clock size={24} color={themeColors.primary} />;
+      case 'success': return <Check size={24} color={themeColors.primary} />;
+      case 'birthday': return <MessageSquare size={24} color={themeColors.warning} />;
+      default: return <Bell size={24} color={themeColors.muted} />;
     }
   };
 
@@ -89,8 +85,8 @@ export const NotificacoesScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <View>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
-                <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <ArrowLeft size={20} color={themeColors.headerText} style={{ marginRight: 4 }} />
                 <Text style={styles.logoText}>
                     <Text style={styles.textGreen}>Minhas </Text>
                     <Text style={styles.textWhite}>Notificações</Text>
@@ -98,13 +94,13 @@ export const NotificacoesScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           <View style={styles.iconBox}>
-            <Bell size={28} color="#6EE794" />
+            <Bell size={28} color={themeColors.primary} />
           </View>
         </View>
         
         <TouchableOpacity style={styles.markAllButton} onPress={markAllAsRead}>
             <Text style={styles.markAllText}>Marcar todas como lidas</Text>
-            <Check size={16} color="#6EE794" />
+            <Check size={16} color={themeColors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -154,7 +150,7 @@ const colors = {
   textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: {
     backgroundColor: colors.backgroundDark,
@@ -207,3 +203,5 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: '#94a3b8', fontSize: 16 },
 });
+
+const styles = baseStyles;

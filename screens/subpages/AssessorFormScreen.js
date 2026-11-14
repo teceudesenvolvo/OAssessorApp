@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
 import { ArrowLeft, Save, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
 import {
@@ -13,7 +14,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth, CLOUD_FUNCTION_URL } from '../../ApiConfig';
+import { auth, CLOUD_FUNCTION_URL } from '../../ApiConfig';
+import { addDocument } from '../../services/firestoreData';
 
 // Funções de Máscara (reutilizando lógica simples)
 const maskCPF = (value) => {
@@ -34,6 +36,7 @@ const maskPhone = (value) => {
 };
 
 export const AssessorFormScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
     const [nome, setNome] = useState('');
     const [cargo, setCargo] = useState('');
     const [cpf, setCpf] = useState('');
@@ -104,20 +107,7 @@ export const AssessorFormScreen = ({ navigation }) => {
         };
 
         try {
-            const user = auth.currentUser;
-            const token = user ? await user.getIdToken() : '';
-
-            const response = await fetch(`${API_BASE_URL}/assessores.json?auth=${token}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(assessorData),
-            });
-
-            if (!response.ok) throw new Error('Erro ao salvar');
-
-            const data = await response.json();
+            await addDocument('assessores', assessorData);
 
             // Envia o convite por email
             await sendInviteEmail(nome, email);
@@ -138,7 +128,7 @@ export const AssessorFormScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Novo</Text>
@@ -240,7 +230,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -283,3 +273,5 @@ const styles = StyleSheet.create({
     },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },
 });
+
+const styles = baseStyles;

@@ -1,7 +1,8 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { registerRootComponent } from 'expo';
+import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -10,7 +11,8 @@ import * as Notifications from 'expo-notifications';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Calendar, Home, Map as MapIcon, PlusCircle, User, Workflow } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Importação das telas
 
@@ -24,6 +26,8 @@ import { MapScreen } from './screens/MapScreen';
 import { PerfilScreen } from './screens/PerfilScreen';
 import { PoliticoScreen } from './screens/PoliticoScreen';
 import { TarefasScreen } from './screens/TarefasScreen';
+import { ApuracaoScreen } from './screens/ApuracaoScreen';
+import { PoliticalStrategyScreen } from './screens/PoliticalStrategyScreen';
 // SubPages
 import { AniversarianteScreen } from './screens/subpages/AniversarianteScreen';
 import { AssessorEditScreen } from './screens/subpages/AssessorEditScreen';
@@ -34,10 +38,12 @@ import { NotificacoesScreen } from './screens/subpages/NotificacoesScreen';
 import { TarefasEditScreen } from './screens/subpages/TarefasEditScreen';
 import { TarefasFormScreen } from './screens/subpages/TarefasFormScreen';
 // ConfigPages
-import { API_BASE_URL, auth } from './ApiConfig';
+import { auth } from './ApiConfig';
+import { getDocument, updateDocument } from './services/firestoreData';
 import { EditProfileScreen } from './screens/configPages/EditProfileScreen';
 import { HelpScreen } from './screens/configPages/HelpScreen';
 import { SecurityScreen } from './screens/configPages/SecurityScreen';
+import { ThemeProvider, useAppTheme } from './contexts/ThemeContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -84,8 +90,119 @@ const AnimatedTabBarIcon = ({ focused, color, size, icon: Icon }) => {
   );
 };
 
+function LiquidGlassTabBar({ state, descriptors, navigation, mode, colors, bottom, slideAnim }) {
+  const [trackWidth, setTrackWidth] = React.useState(0);
+  const translateX = React.useRef(new Animated.Value(0)).current;
+  const stretchX = React.useRef(new Animated.Value(1)).current;
+  const stretchY = React.useRef(new Animated.Value(1)).current;
+  const itemWidth = state.routes.length ? trackWidth / state.routes.length : 0;
+
+  React.useEffect(() => {
+    if (!itemWidth) return;
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: state.index * itemWidth,
+        duration: 360,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(stretchX, { toValue: 1.1, duration: 150, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.spring(stretchX, { toValue: 1, damping: 12, stiffness: 250, mass: 0.6, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(stretchY, { toValue: 0.93, duration: 150, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.spring(stretchY, { toValue: 1, damping: 12, stiffness: 250, mass: 0.6, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [itemWidth, state.index, stretchX, stretchY, translateX]);
+
+  return (
+    <Animated.View pointerEvents="box-none" style={[liquidBarStyles.position, { bottom, transform: [{ translateY: slideAnim }] }]}>
+      <View style={[liquidBarStyles.glass, { backgroundColor: mode === 'dark' ? 'rgba(20,29,24,0.52)' : 'rgba(255,255,255,0.44)', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.9)' }]}>
+        <BlurView tint={mode} intensity={Platform.OS === 'ios' ? 88 : 96} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          pointerEvents="none"
+          colors={mode === 'dark' ? ['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.035)', 'rgba(255,255,255,0.08)'] : ['rgba(255,255,255,0.82)', 'rgba(255,255,255,0.24)', 'rgba(255,255,255,0.5)']}
+          locations={[0, 0.52, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, liquidBarStyles.innerRim, { borderColor: mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.48)' }]} />
+
+        <View style={liquidBarStyles.track} onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}>
+          {itemWidth > 0 && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                liquidBarStyles.activePill,
+                {
+                  width: itemWidth,
+                  borderColor: mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.96)',
+                  backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.66)',
+                  transform: [{ translateX }, { scaleX: stretchX }, { scaleY: stretchY }],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={mode === 'dark' ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.015)'] : ['rgba(255,255,255,0.72)', 'rgba(255,255,255,0.12)']}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+          )}
+
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            const focused = state.index === index;
+            const color = focused ? colors.primary : colors.muted;
+            const label = options.tabBarLabel ?? options.title ?? route.name;
+            const accessibilityLabel = options.tabBarAccessibilityLabel ?? (typeof label === 'string' ? label : route.name);
+
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+            };
+
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={accessibilityLabel}
+                testID={options.tabBarButtonTestID}
+                onPress={onPress}
+                onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+                style={({ pressed }) => [liquidBarStyles.item, pressed && liquidBarStyles.pressed]}
+              >
+                {typeof options.tabBarIcon === 'function' && options.tabBarIcon({ focused, color, size: 21 })}
+                <Text numberOfLines={1} style={[liquidBarStyles.label, { color }]}>{typeof label === 'string' ? label : route.name}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+const liquidBarStyles = StyleSheet.create({
+  position: { position: 'absolute', left: 14, right: 14, zIndex: 10 },
+  glass: { height: 76, padding: 5, borderRadius: 38, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 12 },
+  innerRim: { margin: 1, borderRadius: 37, borderWidth: StyleSheet.hairlineWidth },
+  track: { flex: 1, flexDirection: 'row', position: 'relative' },
+  activePill: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 32, borderWidth: 1, overflow: 'hidden' },
+  item: { flex: 1, alignItems: 'center', justifyContent: 'center', zIndex: 1, gap: 2 },
+  label: { fontSize: 10, fontWeight: '600' },
+  pressed: { opacity: 0.72 },
+});
+
 // --- Configuração das Abas (Dashboard) ---
 function DashboardTabs({ route, navigation }) {
+  const { colors, mode } = useAppTheme();
+  const insets = useSafeAreaInsets();
   // Define qual tela inicial renderizar baseado no parâmetro da rota (role)
   const slideAnim = React.useRef(new Animated.Value(150)).current; // Inicia deslocado para baixo (fora da tela)
 
@@ -113,46 +230,11 @@ function DashboardTabs({ route, navigation }) {
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <LiquidGlassTabBar {...props} mode={mode} colors={colors} bottom={isTablet ? 32 : Math.max(insets.bottom, 10)} slideAnim={slideAnim} />}
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [ // Convertido para array para aceitar estilos animados
-          {
-            position: 'absolute',
-            bottom: isTablet ? 50 : 0, // Aumentado para 50 para garantir que fique acima da navbar do Android
-            left: 10,
-            right: 10,
-            backgroundColor: 'rgba(255, 255, 255, 1)',
-            borderTopWidth: 0,
-            height: 80,
-            borderRadius: 40,
-            paddingTop: 10,
-            paddingBottom: Platform.OS === 'ios' ? 0 : 0,
-            elevation: 10,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.1,
-            shadowRadius: 20,
-            zIndex: 1,
-          },
-          { transform: [{ translateY: slideAnim }] }, // Anima a translação vertical
-        ],
-        tabBarBackground: () => (
-          <View style={{ flex: 1, borderRadius: 40, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.05)' }}>
-            <BlurView tint="light" intensity={Platform.OS === 'ios' ? 30 : 80} style={StyleSheet.absoluteFill} />
-            <LinearGradient
-              colors={['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.0)']}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
-        ),
-        tabBarActiveTintColor: '#6EE794',
-        tabBarInactiveTintColor: '#94a3b8',
-        tabBarLabelStyle: {
-          fontSize: 10,
-          marginBottom: 5,
-        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.muted,
       }}
     >
       <Tab.Screen 
@@ -176,6 +258,7 @@ function DashboardTabs({ route, navigation }) {
           tabBarIcon: ({ focused, color, size }) => <AnimatedTabBarIcon focused={focused} color={color} size={size} icon={PlusCircle} />
         }}
       />
+
       <Tab.Screen 
         name="Agenda" 
         component={TarefasScreen} 
@@ -194,7 +277,8 @@ function DashboardTabs({ route, navigation }) {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const { colors, mode, loaded } = useAppTheme();
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState(null);
   const [initialRoute, setInitialRoute] = useState("Login");
@@ -229,11 +313,8 @@ export default function App() {
     if (user && expoPushToken) {
       const saveToken = async () => {
         try {
-          await fetch(`${API_BASE_URL}/users/${user.uid}.json`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pushToken: expoPushToken })
-          });
+          const userData = await getDocument('users', user.uid);
+          if (userData) await updateDocument('users', user.uid, { pushToken: expoPushToken });
           console.log("SUCESSO: Token salvo/atualizado no Firebase para o usuário", user.uid);
         } catch (err) {
           console.error("ERRO ao salvar token no Firebase:", err);
@@ -248,8 +329,7 @@ export default function App() {
       setUser(u);
       if (u) {
         try {
-          const response = await fetch(`${API_BASE_URL}/users/${u.uid}.json`);
-          const userData = await response.json();
+          const userData = await getDocument('users', u.uid);
           if (userData && userData.tipoUser === 'assessor') {
             setInitialRoute("Assessor");
           } else {
@@ -264,16 +344,19 @@ export default function App() {
     return unsubscribe;
   }, []); 
 
-  if (initializing) {
+  if (initializing || !loaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#101422' }}>
-        <ActivityIndicator size="large" color="#6EE794" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <StatusBar style={mode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
+    <>
+    <StatusBar style={mode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
+    <NavigationContainer theme={{ ...(mode === 'dark' ? DarkTheme : DefaultTheme), colors: { ...(mode === 'dark' ? DarkTheme.colors : DefaultTheme.colors), primary: colors.primary, background: colors.background, card: colors.surface, text: colors.text, border: colors.border, notification: colors.danger } }}>
       <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRoute}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Painel" component={DashboardTabs} initialParams={{ role: 'POLITICO' }} />
@@ -290,9 +373,16 @@ export default function App() {
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Security" component={SecurityScreen} />
         <Stack.Screen name="Help" component={HelpScreen} />
+        <Stack.Screen name="Apuracao" component={ApuracaoScreen} />
+        <Stack.Screen name="EstrategiaPolitica" component={PoliticalStrategyScreen} />
       </Stack.Navigator>
     </NavigationContainer>
+    </>
   );
+}
+
+export default function App() {
+  return <ThemeProvider><AppContent /></ThemeProvider>;
 }
 
 async function registerForPushNotificationsAsync() {

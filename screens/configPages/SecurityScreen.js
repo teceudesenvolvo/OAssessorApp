@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { ArrowLeft, Lock, Shield } from 'lucide-react-native';
 import { useState } from 'react';
@@ -16,6 +17,7 @@ import {
 import { auth } from '../../ApiConfig';
 
 export const SecurityScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -66,7 +68,7 @@ export const SecurityScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Segu</Text>
@@ -144,7 +146,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -169,3 +171,5 @@ const styles = StyleSheet.create({
     button: { height: 56, backgroundColor: colors.primaryGreen, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24, elevation: 4 },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },
 });
+
+const styles = baseStyles;

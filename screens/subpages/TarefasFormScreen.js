@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
 import { AlignLeft, ArrowLeft, Calendar, CheckCircle, Clock, Save } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -12,9 +13,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { API_BASE_URL, auth } from '../../ApiConfig';
+import { auth } from '../../ApiConfig';
+import { addDocument, getDocument } from '../../services/firestoreData';
 
 export const TarefasFormScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
     const [titulo, setTitulo] = useState('');
     const [descricao, setDescricao] = useState('');
     const [data, setData] = useState('');
@@ -47,11 +50,8 @@ export const TarefasFormScreen = ({ navigation }) => {
                 Alert.alert('Erro', 'Usuário não autenticado.');
                 return;
             }
-            const token = await user.getIdToken();
-
             // Buscar dados do usuário para compor adminId e creatorName
-            const userResp = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-            const userData = await userResp.json();
+            const userData = await getDocument('users', user.uid);
 
             const creatorName = userData?.nome || 'Usuário';
             // Se o usuário tem adminId (é assessor), usa ele. Se não, usa o próprio UID (é o admin).
@@ -85,11 +85,7 @@ export const TarefasFormScreen = ({ navigation }) => {
                 updatedAt: new Date().toISOString()
             };
 
-            await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newTask)
-            });
+            await addDocument('tarefas', newTask);
 
             Alert.alert('Sucesso', 'Tarefa criada com sucesso!');
             navigation.goBack();
@@ -115,7 +111,7 @@ export const TarefasFormScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Nova </Text>
@@ -236,7 +232,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -291,3 +287,5 @@ const styles = StyleSheet.create({
     },
     buttonText: { color: colors.white, fontSize: 18, fontWeight: 'bold' },
 });
+
+const styles = baseStyles;

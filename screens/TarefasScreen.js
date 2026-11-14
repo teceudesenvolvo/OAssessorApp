@@ -1,10 +1,15 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Calendar, CheckCircle, Circle, Clock, Plus } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
+import { useThemedStyles } from '../components/use-themed-styles';
+import { useAppTheme } from '../contexts/ThemeContext';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { API_BASE_URL, auth } from '../ApiConfig';
+import { auth } from '../ApiConfig';
+import { getCollection, getDocument, updateDocument } from '../services/firestoreData';
 
 export const TarefasScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
+  const { colors: themeColors } = useAppTheme();
   const [filter, setFilter] = useState('pending'); // 'pending' | 'done'
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,21 +19,8 @@ export const TarefasScreen = ({ navigation }) => {
       setLoading(true);
       const user = auth.currentUser;
       if (!user) return;
-      const token = await user.getIdToken();
-
-      // 1. Buscar todos os usuários e filtrar pelo ID do usuário logado
-      const usersResponse = await fetch(`${API_BASE_URL}/users.json?auth=${token}`);
-      const usersData = await usersResponse.json();
-      
       let targetAdminId = user.uid;
-
-      if (usersData) {
-          const usersList = Object.keys(usersData).map(key => ({
-              id: key,
-              ...usersData[key]
-          }));
-
-          const currentUserData = usersList.find(u => u.id === user.uid || u.userId === user.uid);
+      const currentUserData = await getDocument('users', user.uid);
 
           if (currentUserData) {
               if (currentUserData.tipoUser === 'admin') {
@@ -37,17 +29,14 @@ export const TarefasScreen = ({ navigation }) => {
                   targetAdminId = currentUserData.adminId;
               }
           }
-      }
 
       // 2. Buscar todas as tarefas
-      const tasksResp = await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`);
-      const tasksData = await tasksResp.json();
+      const tasksData = await getCollection('tarefas', [['adminId', targetAdminId]]);
 
       if (tasksData) {
-        const loadedTasks = Object.keys(tasksData).map(key => ({
-          id: key,
+        const loadedTasks = tasksData.map(task => ({
           status: 'pending', // Garante status padrão para tarefas antigas
-          ...tasksData[key]
+          ...task
         })).filter(task => {
           return task.adminId === targetAdminId;
         });
@@ -89,13 +78,7 @@ export const TarefasScreen = ({ navigation }) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
 
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : '';
-      await fetch(`${API_BASE_URL}/tarefas/${id}.json?auth=${token}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
+      await updateDocument('tarefas', id, { status: newStatus });
     } catch (error) {
       console.error(error);
       Alert.alert('Erro', 'Não foi possível atualizar a tarefa.');
@@ -158,7 +141,7 @@ export const TarefasScreen = ({ navigation }) => {
       >
         <View style={styles.taskList}>
           {loading ? (
-            <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 40 }} />
+            <ActivityIndicator size="large" color={themeColors.primary} style={{ marginTop: 40 }} />
           ) : filteredTasks.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>Nenhuma tarefa encontrada.</Text>
@@ -172,21 +155,21 @@ export const TarefasScreen = ({ navigation }) => {
                   hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                 >
                   {item.status === 'done' ? (
-                    <CheckCircle size={24} color="#10b981" />
+                    <CheckCircle size={24} color={themeColors.primary} />
                   ) : (
-                    <Circle size={24} color="#cbd5e1" />
+                    <Circle size={24} color={themeColors.border} />
                   )}
                 </TouchableOpacity>
                 <View style={styles.taskInfo}>
                   <Text style={[styles.taskTitle, item.status === 'done' && styles.taskTitleDone]}>{item.titulo}</Text>
                   <View style={styles.metaRow}>
-                      <Clock size={14} color="#94a3b8" style={{ marginRight: 4 }} />
+                      <Clock size={14} color={themeColors.muted} style={{ marginRight: 4 }} />
                       {/* Usando item.data e item.tipo conforme salvo no formulário */}
                       <Text style={styles.taskMeta}>{item.data} • {item.time}</Text>
                   </View>
                 </View>
-                <View style={[styles.typeTag, { backgroundColor: item.tipo === 'meeting' ? '#dbeafe' : '#f1f5f9' }]}>
-                    <Text style={[styles.typeText, { color: item.tipo === 'meeting' ? '#2563eb' : '#64748b' }]}>
+                <View style={[styles.typeTag, { backgroundColor: item.tipo === 'meeting' ? themeColors.primarySoft : themeColors.surfaceSecondary }]}>
+                    <Text style={[styles.typeText, { color: item.tipo === 'meeting' ? themeColors.primary : themeColors.muted }]}>
                         {getTypeLabel(item.tipo)}
                     </Text>
                 </View>
@@ -197,9 +180,9 @@ export const TarefasScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* FAB Add Button */}
-      <TouchableOpacity style={[styles.fab, {marginBottom: 40}]} onPress={() => navigation.navigate('TarefasForm')}>
+        <TouchableOpacity style={[styles.fab, {marginBottom: 40}]} onPress={() => navigation.navigate('TarefasForm')}>
         <View pointerEvents="none">
-            <Plus size={24} color="white" />
+            <Plus size={24} color={themeColors.onPrimary} />
         </View>
       </TouchableOpacity>
     </View>
@@ -213,7 +196,7 @@ const colors = {
   textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: {
     backgroundColor: colors.backgroundDark,
@@ -258,3 +241,5 @@ const styles = StyleSheet.create({
   
   fab: { position: 'absolute', bottom: 110, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primaryGreen, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primaryGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6, zIndex: 999 },
 });
+
+const styles = baseStyles;

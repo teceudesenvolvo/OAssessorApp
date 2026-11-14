@@ -1,13 +1,20 @@
 // Tela de Político
 import { useFocusEffect } from '@react-navigation/native';
-import { Bell, Calendar, ChevronRight, Gift, Plus, Users } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { API_BASE_URL, auth } from '../ApiConfig';
+import { Bell, Calendar, ChevronRight, Gift, Moon, Plus, Sun, Users } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
+import { useThemedStyles } from '../components/use-themed-styles';
+import { collection, getDocs, or, query, where } from 'firebase/firestore';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { auth, db } from '../ApiConfig';
+import { addDocument, getCollection, getDocument } from '../services/firestoreData';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { HomeQuickActions } from '../components/HomeQuickActions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const PoliticoScreen = ({ navigation }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const { width, height } = Dimensions.get('window');
+    const styles = useThemedStyles(baseStyles);
+  const { colors, mode, toggleTheme } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   const [totalEleitores, setTotalEleitores] = useState(0);
   const [assessoresList, setAssessoresList] = useState([]);
@@ -32,25 +39,27 @@ export const PoliticoScreen = ({ navigation }) => {
   };
 
   const fetchData = async () => {
+    let dashboardStep = 'perfil do usuário';
     try {
         const user = auth.currentUser;
         if (!user) return;
-        const token = await user.getIdToken();
-
-        const responseUser = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-        const dataUser = await responseUser.json();
+        const dataUser = await getDocument('users', user.uid);
         setTipoUser(dataUser?.tipoUser || '');
 
         // 1. Buscar Eleitores
-        const responseEleitores = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
-        const dataEleitores = await responseEleitores.json();
-        let myEleitores = [];
-        
-        if (dataEleitores) {
-            myEleitores = Object.keys(dataEleitores)
-                .map(key => ({ id: key, ...dataEleitores[key] }))
-                .filter(item => item.creatorId === user.uid || item.adminId === user.uid);
-        }
+        dashboardStep = 'lista de eleitores';
+        const eleitoresQuery = query(
+            collection(db, 'eleitores'),
+            or(
+                where('creatorId', '==', user.uid),
+                where('adminId', '==', user.uid)
+            )
+        );
+        const eleitoresSnapshot = await getDocs(eleitoresQuery);
+        const myEleitores = eleitoresSnapshot.docs.map(document => ({
+            id: document.id,
+            ...document.data(),
+        }));
         setTotalEleitores(myEleitores.length);
 
         // Calcular crescimento (Novos eleitores este mês / Total anterior)
@@ -95,45 +104,47 @@ export const PoliticoScreen = ({ navigation }) => {
         setAniversariantesList(birthdays);
 
         // 3. Buscar Assessores
-        const responseAssessores = await fetch(`${API_BASE_URL}/assessores.json?auth=${token}`);
-        const dataAssessores = await responseAssessores.json();
+        dashboardStep = 'equipe de assessores';
+        const dataAssessores = await getCollection('assessores', [['adminId', user.uid]]);
         let myAssessores = [];
 
         if (dataAssessores) {
-            myAssessores = Object.keys(dataAssessores)
-                .map(key => ({ id: key, ...dataAssessores[key] }))
-                .filter(item => item.creatorId === user.uid);
+            myAssessores = dataAssessores;
         }
         setAssessoresList(myAssessores);
 
         // 4. Buscar Tarefas (Atividades Pendentes)
-        const responseTarefas = await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`);
-        const dataTarefas = await responseTarefas.json();
+        dashboardStep = 'tarefas';
+        const dataTarefas = await getCollection('tarefas', [['creatorId', user.uid]]);
         let countTarefas = 0;
         let overdueTasks = [];
         if (dataTarefas) {
-            countTarefas = Object.values(dataTarefas).filter(
-                item => item.creatorId === user.uid && item.status === 'pending'
+            countTarefas = dataTarefas.filter(
+                item => item.status === 'pending'
             ).length;
             
             // Identificar tarefas atrasadas
             const now = new Date();
-            overdueTasks = Object.values(dataTarefas).filter(item => {
-                if (item.creatorId !== user.uid || item.status !== 'pending' || !item.fullDate) return false;
+            overdueTasks = dataTarefas.filter(item => {
+                if (item.status !== 'pending' || !item.fullDate) return false;
                 return new Date(item.fullDate) < now;
             });
         }
         setPendingTasksCount(countTarefas);
 
         // 5. Buscar Notificações (Contar não lidas)
-        const responseNotificacoes = await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`);
-        const dataNotificacoes = await responseNotificacoes.json();
-        const notificationsList = dataNotificacoes ? Object.values(dataNotificacoes) : [];
-
+        dashboardStep = 'notificações';
+        const [personalNotifications, adminNotifications] = await Promise.all([
+            getCollection('notificacoes', [['userId', user.uid]]),
+            getCollection('notificacoes', [['adminId', user.uid]]),
+        ]);
+        const notificationsList = Array.from(new Map(
+            [...personalNotifications, ...adminNotifications].map(item => [item.id, item])
+        ).values());
         let countNotificacoes = 0;
-        if (dataNotificacoes) {
+        if (notificationsList.length) {
             const userEmail = user.email;
-            countNotificacoes = Object.values(dataNotificacoes).filter(n => {
+            countNotificacoes = notificationsList.filter(n => {
                 const isPersonal = n.userEmail && n.userEmail !== "" && n.userEmail === userEmail;
                 const isGlobal = !n.userEmail || n.userEmail === "";
                 return (isPersonal || isGlobal) && !n.read;
@@ -145,6 +156,7 @@ export const PoliticoScreen = ({ navigation }) => {
         const todayStr = new Date().toDateString();
 
         // 1. Notificar Aniversariantes (se ainda não notificado hoje)
+        dashboardStep = 'criação de notificações de aniversário';
         for (const person of birthdays) {
             const alreadyNotified = notificationsList.some(n => 
                 n.type === 'birthday' && 
@@ -153,10 +165,7 @@ export const PoliticoScreen = ({ navigation }) => {
             );
 
             if (!alreadyNotified) {
-                await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                await addDocument('notificacoes', {
                         title: 'Aniversariante do Dia',
                         description: `Hoje é o aniversário de ${person.nome}. Envie uma mensagem!`,
                         type: 'birthday',
@@ -166,12 +175,12 @@ export const PoliticoScreen = ({ navigation }) => {
                         creatorId: user.uid,
                         adminId: user.uid,
                         userEmail: user.email
-                    })
                 });
             }
         }
 
         // 2. Notificar Tarefas Atrasadas (se ainda não notificado hoje)
+        dashboardStep = 'criação de notificações de tarefas';
         for (const task of overdueTasks) {
             const alreadyNotified = notificationsList.some(n => 
                 n.type === 'alert' && 
@@ -180,10 +189,7 @@ export const PoliticoScreen = ({ navigation }) => {
             );
 
             if (!alreadyNotified) {
-                await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                await addDocument('notificacoes', {
                         title: 'Tarefa Atrasada',
                         description: `A tarefa "${task.titulo}" está pendente e atrasada.`,
                         type: 'alert', // Usando um tipo de alerta (pode mapear ícone depois)
@@ -193,13 +199,12 @@ export const PoliticoScreen = ({ navigation }) => {
                         creatorId: user.uid,
                         adminId: user.uid,
                         userEmail: user.email
-                    })
                 });
             }
         }
 
     } catch (error) {
-        console.error("Erro ao carregar dashboard:", error);
+        console.error(`Erro ao carregar dashboard em "${dashboardStep}":`, error?.code, error?.message, error);
     }
   };
 
@@ -207,85 +212,75 @@ export const PoliticoScreen = ({ navigation }) => {
     fetchData();
   }, []));
   
-  useEffect(() => {
-    // Calcula a escala inicial para cobrir a tela (diagonal total)
-    const maxRadius = Math.hypot(width, height);
-    const startScale = maxRadius / 50;
-
-    scaleAnim.setValue(startScale);
-
-    Animated.timing(scaleAnim, {
-      toValue: 0,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.politicoHeader}>
+      <View style={[styles.politicoHeader, { backgroundColor: colors.header, paddingTop: Math.max(insets.top, 12) + 12 }]}>
         <View style={styles.headerTopRow}>
           <View style={styles.welcomeView}>
-            <Text style={styles.welcomeText}>Bem-vindo, Candidato</Text>
-            <Text style={styles.logoText}>
-              <Text style={styles.textGreen}>Iníci</Text>
-              <Text style={styles.textWhite}>o</Text>
-            </Text>
+            <Text style={styles.welcomeText}>Olá, Candidato</Text>
+            <Text style={[styles.dashboardTitle, { color: colors.headerText }]}>Visão geral</Text>
           </View>
-          <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
-            <Bell size={24} color="white" onPress={() => navigation.navigate('Notificacoes')} />
-            {unreadNotificationsCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadNotificationsCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={mode === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} style={styles.bellButton} onPress={toggleTheme}>
+              {mode === 'dark' ? <Sun size={21} color={colors.headerText} /> : <Moon size={21} color={colors.headerText} />}
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notificações" style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
+              <Bell size={21} color={colors.headerText} />
+              {unreadNotificationsCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadNotificationsCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Main Card */}
-        <View style={styles.mainCard}>
+        <View style={[styles.mainCard, { backgroundColor: colors.surface }]}>
           <View>
-            <Text style={styles.cardLabel}>Total de Eleitores</Text>
-            <Text style={styles.cardValue}>{totalEleitores}</Text>
-            <Text style={styles.cardTrend}>
+            <Text style={[styles.cardLabel, { color: colors.muted }]}>Total de Eleitores</Text>
+            <Text style={[styles.cardValue, { color: colors.text }]}>{totalEleitores}</Text>
+            <Text style={[styles.cardTrend, { color: colors.primary }]}>
               {voterGrowth > 0 ? '+' : ''}{voterGrowth.toFixed(1)}% este mês
             </Text>
           </View>
-          <View style={styles.iconBoxBlue}>
-            <Users size={32} color="#101422" />
+          <View style={[styles.iconBoxBlue, { backgroundColor: colors.primarySoft }]}>
+            <Users size={32} color={colors.primary} />
           </View>
 
 
 
         </View>
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, tipoUser !== 'admin' && { width: '100%' }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, tipoUser !== 'admin' && { width: '100%' }]}>
             <Calendar color="#f59e0b" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Atividades Pendentes</Text>
-            <Text style={styles.statValue}>{pendingTasksCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Atividades Pendentes</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{pendingTasksCount}</Text>
           </View>
           {tipoUser === 'admin' && (
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Users color="#3b82f6" size={28} style={{ marginBottom: 8 }} />
-              <Text style={styles.statLabel}>Minha Equipe</Text>
-              <Text style={styles.statValue}>{assessoresList.length} de 10</Text>
+              <Text style={[styles.statLabel, { color: colors.muted }]}>Minha Equipe</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{assessoresList.length} de 10</Text>
             </View>
           )}
         </View>
 
       </View>
 
-      <View style={{ flex: 1, marginTop: 20}} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 124 }}>
         {/* Content */}
         <View style={styles.contentContainer}>
 
+          <HomeQuickActions navigation={navigation} onAddVoter={() => navigation.navigate('Novo')} />
+
 
           {tipoUser === 'admin' && (
-            <View style={{ marginTop: 70 }}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Minha Equipe</Text>
-                <TouchableOpacity style={styles.addButtonSmall} onPress={() => navigation.navigate('AssessorForm')}>
+            <View>
+              <View style={[styles.sectionHeader, { backgroundColor: 'transparent' }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text, backgroundColor: 'transparent' }]}>Minha Equipe</Text>
+                <TouchableOpacity style={[styles.addButtonSmall, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('AssessorForm')}>
                   <Plus size={16} color="#fff" />
                   <Text style={styles.addButtonText}>Novo</Text>
                 </TouchableOpacity>
@@ -298,15 +293,15 @@ export const PoliticoScreen = ({ navigation }) => {
                 contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 10 }}
               >
                 {assessoresList.length === 0 ? (
-                  <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum assessor cadastrado.</Text>
+                    <Text style={{ color: colors.muted, fontStyle: 'italic' }}>Nenhum assessor cadastrado.</Text>
                 ) : (
                   assessoresList.map((item) => (
-                    <TouchableOpacity key={item.id} style={styles.assessorCard} onPress={() => navigation.navigate('AssessorEdit', { assessor: item })}>
+                    <TouchableOpacity key={item.id} style={[styles.assessorCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => navigation.navigate('AssessorEdit', { assessor: item })}>
                       <View style={styles.avatarContainer}><Text style={styles.avatarText}>{item.nome.charAt(0)}</Text></View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.assessorName}>{item.nome}</Text>
-                        <Text style={styles.assessorRole}>{item.cargo}</Text>
-                        <Text style={styles.assessorRole}>{item.qtdCadastros || 0} Eleitores</Text>
+                        <Text style={[styles.assessorName, { color: colors.text }]}>{item.nome}</Text>
+                        <Text style={[styles.assessorRole, { color: colors.muted }]}>{item.cargo}</Text>
+                        <Text style={[styles.assessorRole, { color: colors.muted }]}>{item.qtdCadastros || 0} Eleitores</Text>
                       </View>
                       <ChevronRight size={20} color="#cbd5e1" />
                     </TouchableOpacity>
@@ -316,9 +311,9 @@ export const PoliticoScreen = ({ navigation }) => {
             </View>
           )}
 
-          <View style={tipoUser !== 'admin' ? { marginTop: 70 } : {}}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Aniversariantes do Dia</Text>
+          <View>
+            <View style={[styles.sectionHeader, { backgroundColor: 'transparent' }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text, backgroundColor: 'transparent' }]}>Aniversariantes do Dia</Text>
             </View>
 
             <ScrollView 
@@ -328,17 +323,17 @@ export const PoliticoScreen = ({ navigation }) => {
               contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 10 }}
             >
               {aniversariantesList.length === 0 ? (
-                <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Nenhum aniversariante hoje.</Text>
+                    <Text style={{ color: colors.muted, fontStyle: 'italic' }}>Nenhum aniversariante hoje.</Text>
               ) : (
                 aniversariantesList.map((item) => (
-                  <TouchableOpacity key={item.id} style={styles.assessorCard} onPress={() => navigation.navigate('Aniversariante', { person: item })}>
+                  <TouchableOpacity key={item.id} style={[styles.assessorCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => navigation.navigate('Aniversariante', { person: item })}>
                     <View style={[styles.avatarContainer, { backgroundColor: '#dbeafe' }]}>
                       <Text style={[styles.avatarText, { color: '#2563eb' }]}>{item.nome.charAt(0)}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.assessorName}>{item.nome}</Text>
-                      <Text style={styles.assessorRole}>{item.cargo}</Text>
-                      <Text style={styles.assessorRole}>Completa {item.idade} anos</Text>
+                      <Text style={[styles.assessorName, { color: colors.text }]}>{item.nome}</Text>
+                      <Text style={[styles.assessorRole, { color: colors.muted }]}>{item.cargo}</Text>
+                      <Text style={[styles.assessorRole, { color: colors.muted }]}>Completa {item.idade} anos</Text>
                     </View>
                     <Gift size={20} color="#cbd5e1" />
                   </TouchableOpacity>
@@ -347,16 +342,8 @@ export const PoliticoScreen = ({ navigation }) => {
             </ScrollView>
           </View>
         </View>
-      </View>
+      </ScrollView>
 
-      {/* Círculo de Transição (Reveal) */}
-      <Animated.View
-        style={[
-          styles.transitionCircle,
-          { transform: [{ scale: scaleAnim }] }
-        ]}
-        pointerEvents="none"
-      />
     </View>
   );
 };
@@ -370,15 +357,14 @@ const colors = {
   textDark: '#000000',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
   },
   politicoHeader: {
     backgroundColor: '#101422',
-    paddingTop: 24,
-    paddingBottom: 100,
+    paddingBottom: 18,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
@@ -392,8 +378,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
-    marginTop: 60,
+    marginBottom: 18,
+    marginTop: 0,
   },
   welcomeView: {
     flex: 1,
@@ -438,15 +424,12 @@ const styles = StyleSheet.create({
   cardValue: { fontSize: 36, fontWeight: '900', color: '#0f172a', marginTop: 4 },
   cardTrend: { color: '#10b981', fontSize: 12, fontWeight: 'bold', marginTop: 4 },
   iconBoxBlue: { backgroundColor: '#dbeafe', padding: 16, borderRadius: 16 },
-  contentContainer: { paddingHorizontal: 24, marginTop: -24, gap: 16 },
+  contentContainer: { paddingHorizontal: 24, paddingTop: 20, gap: 18 },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    position: 'absolute',
-    bottom: -40,
-    left: 24,
-    right: 24,
-    zIndex: 1,
+    gap: 12,
+    marginTop: 12,
   },
   logoText: {
     fontSize: 32,
@@ -465,7 +448,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: '#f1f5f9',
-    width: '48%',
+    flex: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -474,8 +457,8 @@ const styles = StyleSheet.create({
   },
   statLabel: { color: '#94a3b8', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
   statValue: { fontSize: 20, fontWeight: '900', color: '#1e293b' },
-  sectionTitle: { color: '#0f172a', fontWeight: 'bold', fontSize: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { color: '#0f172a', fontWeight: 'bold', fontSize: 20, backgroundColor: 'transparent' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, backgroundColor: 'transparent' },
   addButtonSmall: { flexDirection: 'row', backgroundColor: '#101422', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center', gap: 4 },
   addButtonText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
   assessorCard: {
@@ -498,17 +481,6 @@ const styles = StyleSheet.create({
   avatarText: { color: '#64748b', fontWeight: 'bold', fontSize: 16 },
   assessorName: { color: '#0f172a', fontWeight: 'bold', fontSize: 14 },
   assessorRole: { color: '#64748b', fontSize: 12 },
-  transitionCircle: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 100,
-    height: 100,
-    marginTop: -50,
-    marginLeft: -50,
-    borderRadius: 50,
-    backgroundColor: '#6EE794',
-    zIndex: 9999,
-    elevation: 100,
-  },
 });
+
+const styles = baseStyles;

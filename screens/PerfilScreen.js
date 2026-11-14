@@ -4,18 +4,24 @@ import * as Notifications from 'expo-notifications';
 import { signOut } from 'firebase/auth';
 import { ChevronRight, HelpCircle, LogOut, Shield, UserCog } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
+import { useThemedStyles } from '../components/use-themed-styles';
+import { useAppTheme } from '../contexts/ThemeContext';
 import {
     ActivityIndicator,
     Alert,
+    ScrollView,
     Share,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
-import { API_BASE_URL, auth } from '../ApiConfig';
+import { auth } from '../ApiConfig';
+import { addDocument, getCollection, getDocument } from '../services/firestoreData';
 
 export const PerfilScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
+    const { colors: themeColors } = useAppTheme();
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -24,22 +30,12 @@ export const PerfilScreen = ({ navigation }) => {
         if (!user) return;
 
         try {
-            const token = await user.getIdToken();
-            // Tenta buscar diretamente pelo UID
-            let response = await fetch(`${API_BASE_URL}/users/${user.uid}.json?auth=${token}`);
-            let data = await response.json();
+            let data = await getDocument('users', user.uid);
 
             // Se não encontrar (null), busca na coleção inteira filtrando por userId ou email
             if (!data) {
-                const usersResponse = await fetch(`${API_BASE_URL}/users.json?auth=${token}`);
-                const usersData = await usersResponse.json();
-                if (usersData) {
-                    const foundUser = Object.values(usersData).find(u => 
-                        (u.userId && u.userId === user.uid) || 
-                        (u.email && u.email === user.email)
-                    );
-                    if (foundUser) data = foundUser;
-                }
+                const byUid = await getCollection('users', [['userId', user.uid]]);
+                data = byUid[0] || null;
             }
             
             setUserData(data);
@@ -141,19 +137,15 @@ export const PerfilScreen = ({ navigation }) => {
         if (!user) return;
 
         try {
-            const token = await user.getIdToken();
-            await fetch(`${API_BASE_URL}/notificacoes.json?auth=${token}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            await addDocument('notificacoes', {
                     title: 'Teste de Push Remoto 🚀',
                     description: 'Se você recebeu isso, a Cloud Function está funcionando!',
                     type: 'system',
                     read: false,
                     createdAt: new Date().toISOString(),
                     userId: user.uid,
+                    adminId: user.uid,
                     userEmail: user.email
-                })
             });
             Alert.alert('Enviado', 'Notificação criada no banco de dados.\n\nAguarde alguns segundos pelo Push Notification.');
         } catch (error) {
@@ -170,12 +162,12 @@ export const PerfilScreen = ({ navigation }) => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}></Text>
+                <Text style={styles.headerTitle}>Perfil</Text>
             </View>
 
-            <View style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingTop: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
                 {loading ? (
-                    <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 40 }} />
+                    <ActivityIndicator size="large" color={themeColors.primary} style={{ marginTop: 40 }} />
                 ) : (
                     <>
                         <View style={styles.profileCard}>
@@ -198,11 +190,11 @@ export const PerfilScreen = ({ navigation }) => {
                                 >
                                     <View style={styles.menuItemLeft}>
                                         <View style={styles.iconContainer}>
-                                            <item.icon size={20} color="#64748b" />
+                                            <item.icon size={20} color={themeColors.muted} />
                                         </View>
                                         <Text style={styles.menuItemText}>{item.label}</Text>
                                     </View>
-                                    <ChevronRight size={20} color="#cbd5e1" />
+                                    <ChevronRight size={20} color={themeColors.border} />
                                 </TouchableOpacity>
                             ))}
 
@@ -224,13 +216,13 @@ export const PerfilScreen = ({ navigation }) => {
                             </TouchableOpacity> */}
 
                             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                                <LogOut size={20} color="#ef4444" />
+                                <LogOut size={20} color={themeColors.danger} />
                                 <Text style={styles.logoutText}>Sair da Conta</Text>
                             </TouchableOpacity>
                         </View>
                     </>
                 )}
-            </View>
+            </ScrollView>
         </View>
     );
 };
@@ -241,7 +233,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: { backgroundColor: colors.backgroundDark, paddingTop: 60, paddingBottom: 24, paddingHorizontal: 24, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, alignItems: 'center' },
     headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
@@ -260,3 +252,5 @@ const styles = StyleSheet.create({
     logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, marginTop: 8 },
     logoutText: { color: '#ef4444', fontWeight: 'bold', fontSize: 16, marginLeft: 8 },
 });
+
+const styles = baseStyles;

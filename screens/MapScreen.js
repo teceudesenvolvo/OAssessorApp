@@ -1,91 +1,145 @@
 import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, StyleSheet, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useThemedStyles } from '../components/use-themed-styles';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { ActivityIndicator, Dimensions, StyleSheet, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import { API_BASE_URL, auth } from '../ApiConfig';
+import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { auth, db } from '../ApiConfig';
 
 export const MapScreen = () => {
+    const styles = useThemedStyles(baseStyles);
+  const { mode, colors } = useAppTheme();
   const mapRef = useRef(null);
   // Coordenadas iniciais (Exemplo: Centro de uma cidade)
   const [region, setRegion] = useState({
-    latitude: -26.9136, 
-    longitude: -49.0691,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
+    latitude: -3.7319,
+    longitude: -38.5267,
+    latitudeDelta: 0.12,
+    longitudeDelta: 0.12,
   });
   const [markers, setMarkers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Precisamos da sua localização para exibir no mapa.');
-        return;
+    let active = true;
+    const isCoordinate = value => value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value));
+    const validCoordinates = (latitude, longitude) => isCoordinate(latitude) && isCoordinate(longitude)
+      && Math.abs(Number(latitude)) <= 90 && Math.abs(Number(longitude)) <= 180;
+    const addressValue = value => String(value ?? '').trim();
+    const geocodeAddress = eleitor => {
+      const street = [addressValue(eleitor.endereco || eleitor.logradouro || eleitor.rua), addressValue(eleitor.numero || eleitor.numeroEndereco)].filter(Boolean).join(', ');
+      const neighborhood = addressValue(eleitor.bairro);
+      const city = addressValue(eleitor.cidade || eleitor.municipio);
+      const state = addressValue(eleitor.estado || eleitor.uf);
+      const postalCode = addressValue(eleitor.cep);
+      // A name is never part of an address. Require geographic context so we
+      // don't send incomplete street fragments to the platform geocoder.
+      if (!city || !state || (!street && !neighborhood && !postalCode)) return '';
+      return [street, neighborhood, city, state, postalCode, 'Brasil'].filter(Boolean).join(', ');
+    };
+
+    const loadMap = async () => {
+      let userRegion = null;
+      let myEleitores = [];
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          userRegion = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.04,
+            longitudeDelta: 0.04,
+          };
+          if (active) setRegion(userRegion);
+        }
+      } catch (error) {
+        console.warn('[Mapa] Não foi possível obter a localização atual:', error?.code || error?.message || 'erro desconhecido');
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      const userRegion = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      };
-      
-      setRegion(userRegion);
-      mapRef.current?.animateToRegion(userRegion, 1000);
-
-      // Buscar eleitores do Firebase
-      let myEleitores = [];
       try {
         const user = auth.currentUser;
         if (user) {
-          const token = await user.getIdToken();
-          const response = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
-          const data = await response.json();
-          if (data) {
-            myEleitores = Object.keys(data)
-              .map(key => ({ id: key, ...data[key] }))
-              .filter(item => item.creatorId === user.uid);
-          }
+          const eleitoresQuery = query(collection(db, 'eleitores'), where('creatorId', '==', user.uid));
+          const snapshot = await getDocs(eleitoresQuery);
+          myEleitores = snapshot.docs.map(document => ({ id: document.id, ...document.data() }));
         }
       } catch (error) {
-        console.log('Erro ao buscar eleitores:', error);
+        console.error('[Mapa] Falha ao carregar eleitores:', error?.code || error?.message || error);
       }
 
-      // Geocodificação dos endereços dos eleitores
+      let coordinateCache = {};
+      try { coordinateCache = JSON.parse((await AsyncStorage.getItem('@oassessor/map-coordinates-v1')) || '{}'); } catch {}
       const loadedMarkers = [];
       for (const eleitor of myEleitores) {
+        if (!active) return;
+        const storedLatitude = eleitor.lat ?? eleitor.latitude;
+        const storedLongitude = eleitor.lng ?? eleitor.longitude;
+        if (validCoordinates(storedLatitude, storedLongitude)) {
+          loadedMarkers.push({ ...eleitor, lat: Number(storedLatitude), lng: Number(storedLongitude) });
+          continue;
+        }
+
+        const fullAddress = geocodeAddress(eleitor);
+        if (!fullAddress) continue;
+        const cacheKey = `${eleitor.id}:${fullAddress.toLocaleLowerCase('pt-BR')}`;
+        const cached = coordinateCache[cacheKey];
+        if (cached && validCoordinates(cached.lat, cached.lng)) {
+          loadedMarkers.push({ ...eleitor, lat: Number(cached.lat), lng: Number(cached.lng) });
+          continue;
+        }
+        if (cached?.notFoundAt && Date.now() - cached.notFoundAt < 30 * 24 * 60 * 60 * 1000) continue;
+        if (cached?.retryAt && Date.now() < cached.retryAt) continue;
+
         try {
-          // Tenta obter as coordenadas a partir do endereço
-          // Monta o endereço completo limpando campos vazios
-          const addressParts = [
-            eleitor.endereco,
-            eleitor.numero,
-            eleitor.bairro,
-            eleitor.cidade,
-            eleitor.estado
-          ].filter(part => part && part.trim() !== '');
-
-          const fullAddress = addressParts.join(', ');
-
-          if (fullAddress.length < 5) continue; // Pula se o endereço for muito curto
-
           const geocoded = await Location.geocodeAsync(fullAddress);
-          if (geocoded.length > 0) {
-            loadedMarkers.push({
-              ...eleitor,
-              lat: geocoded[0].latitude,
-              lng: geocoded[0].longitude,
-            });
+          const point = geocoded.find(item => validCoordinates(item.latitude, item.longitude));
+          if (!point) {
+            coordinateCache[cacheKey] = { notFoundAt: Date.now() };
+            continue;
           }
+          const latitude = Number(point.latitude);
+          const longitude = Number(point.longitude);
+          loadedMarkers.push({ ...eleitor, lat: latitude, lng: longitude });
+          coordinateCache[cacheKey] = { lat: latitude, lng: longitude };
+          // Persist successful coordinates so future map visits don't repeat
+          // geocoding. A permission/network failure here doesn't hide the pin.
+          try { await updateDoc(doc(db, 'eleitores', eleitor.id), { lat: latitude, lng: longitude }); }
+          catch (error) { console.warn('[Mapa] Coordenada exibida, mas não foi persistida:', error?.code || 'firestore-error'); }
         } catch (error) {
-          console.log('Erro ao geocodificar:', eleitor.nome);
+          // Avoid logging names or street addresses; geocoder errors can occur
+          // for incomplete or unrecognized addresses and are not app crashes.
+          console.warn('[Mapa] Endereço não localizado:', { eleitorId: eleitor.id, code: error?.code || 'geocode-error' });
+          coordinateCache[cacheKey] = { retryAt: Date.now() + 5 * 60 * 1000 };
         }
       }
+      try { await AsyncStorage.setItem('@oassessor/map-coordinates-v1', JSON.stringify(coordinateCache)); } catch {}
+      if (!active) return;
       setMarkers(loadedMarkers);
-      setLoading(false);
-    })();
+
+      if (loadedMarkers.length) {
+        const coordinates = loadedMarkers.map(item => ({ latitude: item.lat, longitude: item.lng }));
+        if (coordinates.length === 1) {
+          const point = coordinates[0];
+          const markerRegion = { ...point, latitudeDelta: 0.025, longitudeDelta: 0.025 };
+          setRegion(markerRegion);
+          requestAnimationFrame(() => mapRef.current?.animateToRegion(markerRegion, 500));
+        } else {
+          requestAnimationFrame(() => mapRef.current?.fitToCoordinates(coordinates, {
+            edgePadding: { top: 70, right: 50, bottom: 120, left: 50 }, animated: true,
+          }));
+        }
+      } else if (userRegion) {
+        requestAnimationFrame(() => mapRef.current?.animateToRegion(userRegion, 500));
+      }
+    };
+
+    loadMap().catch(error => {
+      console.error('[Mapa] Falha inesperada ao carregar mapa:', error?.code || error?.message || error);
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   // Função para definir a cor do pin baseada no status
@@ -102,6 +156,7 @@ export const MapScreen = () => {
       <MapView
         ref={mapRef}
         style={styles.map}
+        userInterfaceStyle={mode}
         initialRegion={region}
         showsUserLocation={true} // Mostra a localização atual do usuário (precisa de permissão)
         showsMyLocationButton={true}
@@ -119,14 +174,14 @@ export const MapScreen = () => {
       </MapView>
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6EE794" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -146,3 +201,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.7)',
   },
 });
+
+const styles = baseStyles;

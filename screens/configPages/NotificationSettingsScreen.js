@@ -1,8 +1,10 @@
+import { useThemedStyles } from '../../components/use-themed-styles';
 import { ArrowLeft, Bell } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 export const NotificationSettingsScreen = ({ navigation }) => {
+    const styles = useThemedStyles(baseStyles);
     const [pushEnabled, setPushEnabled] = useState(true);
     const [emailEnabled, setEmailEnabled] = useState(true);
     const [taskAlerts, setTaskAlerts] = useState(true);
@@ -14,7 +16,7 @@ export const NotificationSettingsScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.headerTopRow}>
                     <View>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 20 }}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={{ minHeight: 56, minWidth: 56, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                             <ArrowLeft size={20} color="#fff" style={{ marginRight: 4 }} />
                             <Text style={styles.logoText}>
                                 <Text style={styles.textGreen}>Configurar </Text>
@@ -102,7 +104,7 @@ const colors = {
     textDark: '#0f172a',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     header: {
         backgroundColor: colors.backgroundDark,
@@ -125,3 +127,5 @@ const styles = StyleSheet.create({
     settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingVertical: 4 },
     settingLabel: { fontSize: 16, color: '#334155', fontWeight: '500' },
 });
+
+const styles = baseStyles;

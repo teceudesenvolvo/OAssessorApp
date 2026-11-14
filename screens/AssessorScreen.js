@@ -1,13 +1,20 @@
 // Tela de Político
 import { useFocusEffect } from '@react-navigation/native';
-import { AlertTriangle, BarChart3, Bell, Users } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { API_BASE_URL, auth } from '../ApiConfig';
+import { AlertTriangle, BarChart3, Bell, Moon, Sun, Users } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
+import { useThemedStyles } from '../components/use-themed-styles';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { auth, db } from '../ApiConfig';
+import { getCollection } from '../services/firestoreData';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { HomeQuickActions } from '../components/HomeQuickActions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const AssessorScreen = ({ navigation }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const { width, height } = Dimensions.get('window');
+    const styles = useThemedStyles(baseStyles);
+  const { colors, mode, toggleTheme } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [totalEleitores, setTotalEleitores] = useState(0);
@@ -17,6 +24,7 @@ export const AssessorScreen = ({ navigation }) => {
 
   const fetchData = async () => {
     setLoading(true);
+    let dashboardStep = 'lista de eleitores';
     try {
         const user = auth.currentUser;
         if (!user) {
@@ -24,17 +32,13 @@ export const AssessorScreen = ({ navigation }) => {
             return;
         }
         
-        const token = await user.getIdToken();
-
         // 1. Fetch voters created by the assessor
-        const eleitoresResponse = await fetch(`${API_BASE_URL}/eleitores.json?auth=${token}`);
-        const eleitoresData = await eleitoresResponse.json();
-        let myEleitores = [];
-        if (eleitoresData) {
-            myEleitores = Object.values(eleitoresData).filter(
-                eleitor => eleitor.creatorId === user.uid
-            );
-        }
+        const eleitoresQuery = query(
+            collection(db, 'eleitores'),
+            where('creatorId', '==', user.uid)
+        );
+        const eleitoresSnapshot = await getDocs(eleitoresQuery);
+        const myEleitores = eleitoresSnapshot.docs.map(document => document.data());
         setTotalEleitores(myEleitores.length);
 
         // Calculate growth
@@ -66,104 +70,93 @@ export const AssessorScreen = ({ navigation }) => {
         }
 
         // 3. Fetch overdue tasks for the assessor
-        const tarefasResponse = await fetch(`${API_BASE_URL}/tarefas.json?auth=${token}`);
-        const tarefasData = await tarefasResponse.json();
+        dashboardStep = 'tarefas';
+        const tarefasData = await getCollection('tarefas', [['creatorId', user.uid]]);
         let overdueCount = 0;
         if (tarefasData) {
             const now = new Date();
-            overdueCount = Object.values(tarefasData).filter(
-                task => task.creatorId === user.uid && task.status === 'pending' && task.fullDate && new Date(task.fullDate) < now
+            overdueCount = tarefasData.filter(
+                task => task.status === 'pending' && task.fullDate && new Date(task.fullDate) < now
             ).length;
         }
         setOverdueTasks(overdueCount);
 
     } catch (error) {
-        console.error("Erro ao carregar dashboard do assessor:", error);
+        console.error(`Erro ao carregar dashboard do assessor em "${dashboardStep}":`, error?.code, error?.message, error);
         Alert.alert('Erro', 'Não foi possível carregar os dados do dashboard.');
     } finally {
         setLoading(false);
     }
   };
 
-  useEffect(() => {
-    // Calcula a escala inicial para cobrir a tela (diagonal total)
-    const maxRadius = Math.hypot(width, height);
-    const startScale = maxRadius / 50;
-
-    scaleAnim.setValue(startScale);
-
-    Animated.timing(scaleAnim, {
-      toValue: 0,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
   useFocusEffect(useCallback(() => {
     fetchData();
   }, []));
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.politicoHeader}>
+      <View style={[styles.politicoHeader, { backgroundColor: colors.header, paddingTop: Math.max(insets.top, 12) + 12 }]}>
         <View style={styles.headerTopRow}>
           <View style={styles.welcomeView}>
-            <Text style={styles.welcomeText}>Bem-vindo, Assessor</Text>
-            <Text style={styles.logoText}>
-              <Text style={styles.textWhite}>Iníci</Text>
-              <Text style={styles.textGreen}>o</Text>
-            </Text>
+            <Text style={styles.welcomeText}>Olá, Assessor</Text>
+            <Text style={[styles.dashboardTitle, { color: colors.headerText }]}>Visão geral</Text>
           </View>
-          <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
-            <Bell size={24} color="white" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={mode === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} style={styles.bellButton} onPress={toggleTheme}>
+              {mode === 'dark' ? <Sun size={21} color={colors.headerText} /> : <Moon size={21} color={colors.headerText} />}
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notificações" style={styles.bellButton} onPress={() => navigation.navigate('Notificacoes')}>
+              <Bell size={21} color={colors.headerText} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Main Card */}
-        <View style={styles.mainCard}>
+        <View style={[styles.mainCard, { backgroundColor: colors.surface }]}>
           <View>
-            <Text style={styles.cardLabel}>Total de Eleitores</Text>
-            <Text style={styles.cardValue}>{loading ? '...' : totalEleitores}</Text>
-            <Text style={styles.cardTrend}>
+            <Text style={[styles.cardLabel, { color: colors.muted }]}>Total de Eleitores</Text>
+            <Text style={[styles.cardValue, { color: colors.text }]}>{loading ? '...' : totalEleitores}</Text>
+            <Text style={[styles.cardTrend, { color: colors.primary }]}>
               {loading ? '' : `${voterGrowth >= 0 ? '+' : ''}${voterGrowth.toFixed(1)}% este mês`}
             </Text>
           </View>
-          <View style={styles.iconBoxBlue}>
-            <Users size={32} color="#101422" />
+          <View style={[styles.iconBoxBlue, { backgroundColor: colors.primarySoft }]}>
+            <Users size={32} color={colors.primary} />
           </View>
 
 
 
         </View>
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <BarChart3 color="#10b981" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Engajamento (Apoiadores)</Text>
-            <Text style={styles.statValue}>{loading ? '...' : `${engagement.toFixed(1)}%`}</Text>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Engajamento (Apoiadores)</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{loading ? '...' : `${engagement.toFixed(1)}%`}</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <AlertTriangle color="#f43f5e" size={28} style={{ marginBottom: 8 }} />
-            <Text style={styles.statLabel}>Tarefas Atrasadas</Text>
-            <Text style={styles.statValue}>{loading ? '...' : overdueTasks}</Text>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Tarefas Atrasadas</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{loading ? '...' : overdueTasks}</Text>
           </View>
         </View>
 
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#6EE794" style={{ marginTop: 80 }} />
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 20, paddingBottom: 124 }}>
           {/* Content */}
           <View style={styles.contentContainer}>
-            <View style={{ marginTop: 70, }}>
-              <Text style={styles.sectionTitle}>Intensidade por Região</Text>
-              <View style={styles.mapContainer}>
+            <HomeQuickActions navigation={navigation} onAddVoter={() => navigation.navigate('Novo')} />
+            <View style={{ marginTop: 0 }}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Intensidade por Região</Text>
+              <View style={[styles.mapContainer, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
                 <View style={styles.mapCircle1} />
                 <View style={styles.mapCircle2} />
-                <View style={styles.mapLabel}>
-                  <Text style={styles.mapLabelText}>VISUALIZAÇÃO GIS</Text>
+                <View style={[styles.mapLabel, { backgroundColor: colors.surface }]}>
+                  <Text style={[styles.mapLabelText, { color: colors.muted }]}>VISUALIZAÇÃO GIS</Text>
                 </View>
               </View>
             </View>
@@ -171,14 +164,6 @@ export const AssessorScreen = ({ navigation }) => {
         </ScrollView>
       )}
 
-      {/* Círculo de Transição (Reveal) */}
-      <Animated.View
-        style={[
-          styles.transitionCircle,
-          { transform: [{ scale: scaleAnim }] }
-        ]}
-        pointerEvents="none"
-      />
     </View>
   );
 };
@@ -192,15 +177,14 @@ const colors = {
   textDark: '#000000',
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
   },
   politicoHeader: {
     backgroundColor: '#101422',
-    paddingTop: 24,
-    paddingBottom: 100,
+    paddingBottom: 18,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
@@ -214,8 +198,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
-    marginTop: 60,
+    marginBottom: 18,
+    marginTop: 0,
   },
   welcomeView: {
     flex: 1,
@@ -241,14 +225,12 @@ const styles = StyleSheet.create({
   cardValue: { fontSize: 36, fontWeight: '900', color: '#0f172a', marginTop: 4 },
   cardTrend: { color: '#10b981', fontSize: 12, fontWeight: 'bold', marginTop: 4 },
   iconBoxBlue: { backgroundColor: '#dbeafe', padding: 16, borderRadius: 16 },
-  contentContainer: { paddingHorizontal: 24, marginTop: -24, gap: 16 },
+  contentContainer: { paddingHorizontal: 24, gap: 18 },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    position: 'absolute',
-    bottom: -29,
-    left: 24,
-    right: 24,
+    gap: 12,
+    marginTop: 12,
   },
   logoText: {
     fontSize: 32,
@@ -267,7 +249,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: '#f1f5f9',
-    width: '48%',
+    flex: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -294,17 +276,6 @@ const styles = StyleSheet.create({
   mapCircle2: { position: 'absolute', bottom: 40, right: 40, width: 160, height: 160, backgroundColor: '#10b981', borderRadius: 9999, opacity: 0.3 },
   mapLabel: { backgroundColor: 'rgba(255,255,255,0.8)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9999 },
   mapLabelText: { color: '#64748b', fontWeight: 'bold', fontSize: 12 },
-  transitionCircle: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 100,
-    height: 100,
-    marginTop: -50,
-    marginLeft: -50,
-    borderRadius: 50,
-    backgroundColor: '#6EE794',
-    zIndex: 9999,
-    elevation: 100,
-  },
 });
+
+const styles = baseStyles;
