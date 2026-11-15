@@ -2,7 +2,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
-const { queryTseHistorical } = require('./tseHistorical');
+const { queryTseHistorical, queryTseTerritorial } = require('./tseHistorical');
 
 admin.initializeApp();
 
@@ -14,7 +14,8 @@ exports.tseHistoricalResults = onRequest({
   invoker: 'public',
   timeoutSeconds: 540,
   memory: '4GiB',
-  concurrency: 5,
+  // Territorial archives are large; keep one scan at a time per instance.
+  concurrency: 1,
 }, async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
   const authorization = req.headers.authorization || '';
@@ -24,16 +25,16 @@ exports.tseHistoricalResults = onRequest({
     await admin.auth().verifyIdToken(token);
     const input = req.body || {};
     const cargoCodes = { Presidente: '1', Governador: '3', Senador: '5', 'Deputado federal': '6', 'Deputado estadual/distrital': '7', Prefeito: '11', Vereador: '13' };
-    const cacheKey = [Number(input.year), String(input.uf || '').toUpperCase(), Number(input.turn), cargoCodes[input.cargo] || 'x', String(input.municipalityCode || 'municipalities')].join('_');
+    const cacheKey = ['v3', Number(input.year), String(input.uf || '').toUpperCase(), Number(input.turn), cargoCodes[input.cargo] || 'x', String(input.municipalityCode || 'municipalities'), String(input.granularity || 'municipality'), String(input.zoneCode || 'all-zones'), String(input.locationCode || 'all-locations'), String(input.sectionCode || 'all-sections')].join('_');
     const cacheRef = admin.firestore().collection('tseHistoricalStaticCache').doc(cacheKey);
     const cached = await cacheRef.get();
     if (cached.exists) return res.status(200).json(cached.data());
-    const result = await queryTseHistorical(input);
+    const result = input.granularity ? await queryTseTerritorial(input) : await queryTseHistorical(input);
     await cacheRef.set({ ...result, cachedAt: admin.firestore.FieldValue.serverTimestamp() });
     return res.status(200).json(result);
   } catch (error) {
     console.error('[TSE histórico]', error);
-    const clientError = /inválidos|não reconhecido/.test(error.message || '');
+    const clientError = /inválidos|não reconhecido|selecione|não há eleição|não corresponde/.test(error.message || '');
     return res.status(clientError ? 400 : 502).json({ error: error.message || 'Não foi possível consultar o acervo do TSE.' });
   }
 });
